@@ -1,0 +1,36 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "d:\\ue5_projects\\miforge_plugindev\\plugins\\miforge\\source\\miforge\\private\\miforge.cpp",
+        "ProvidedModule": "",
+        "PCH": "d:\\ue5_projects\\miforge_plugindev\\intermediate\\build\\win64\\x64\\miforge_plugindeveditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.h.pch",
+        "Includes": [
+            "d:\\ue5_projects\\miforge_plugindev\\plugins\\miforge\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\miforge\\definitions.miforge.h",
+            "d:\\ue5_projects\\miforge_plugindev\\plugins\\miforge\\source\\miforge\\public\\miforge.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\source\\editor\\contentbrowser\\public\\contentbrowsermodule.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\source\\editor\\contentbrowser\\public\\contentbrowserdelegates.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\source\\developer\\assettools\\public\\iassettypeactions.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\source\\developer\\merge\\public\\merge.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\source\\editor\\unrealed\\classes\\thumbnailrendering\\thumbnailmanager.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\source\\editor\\unrealed\\classes\\thumbnailrendering\\thumbnailrenderer.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\unrealed\\uht\\thumbnailrenderer.generated.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\unrealed\\uht\\thumbnailmanager.generated.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\source\\editor\\contentbrowserdata\\public\\contentbrowserdatalegacybridge.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\source\\editor\\contentbrowserdata\\public\\contentbrowserdatamenucontexts.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\source\\editor\\contentbrowserdata\\public\\contentbrowseritem.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\source\\editor\\contentbrowserdata\\public\\contentbrowseritemdata.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\contentbrowserdata\\uht\\contentbrowseritem.generated.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\source\\developer\\collectionmanager\\public\\collectionmanagertypes.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\source\\developer\\sourcecontrol\\public\\isourcecontrolstate.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\contentbrowserdata\\uht\\contentbrowserdatamenucontexts.generated.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\contentbrowserdata\\uht\\contentbrowserdatalegacybridge.generated.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\source\\editor\\contentbrowser\\public\\experimental\\contentbrowserviewextender.h",
+            "d:\\program files\\ue5\\ue_5.6\\engine\\source\\editor\\contentbrowser\\public\\assetviewtypes.h",
+            "d:\\ue5_projects\\miforge_plugindev\\plugins\\miforge\\source\\miforge\\public\\maintabwidget.h",
+            "d:\\ue5_projects\\miforge_plugindev\\plugins\\miforge\\source\\miforge\\public\\miforgetypes.h",
+            "d:\\ue5_projects\\miforge_plugindev\\plugins\\miforge\\source\\miforge\\public\\miforgestyle.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}
