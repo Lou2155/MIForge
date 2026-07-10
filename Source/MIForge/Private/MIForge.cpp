@@ -101,8 +101,8 @@ TSharedRef<SDockTab> FMIForgeModule::OnSpawnMIForgeMainTab(const FSpawnTabArgs& 
 
 	MIForgeMainTab->SetContent(
 		SNew(SBox)
-		.MinDesiredWidth(1100.f)
-		.MinDesiredHeight(700.f)
+		.MinDesiredWidth(1136.f)
+		.MinDesiredHeight(728.f)
 		[
 			SNew(SMainTabWidget)
 				.SelectedFolderPaths(SelectedFolderPaths)

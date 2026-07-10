@@ -40,6 +40,46 @@ namespace
 		FLinearColor(0.10f, 0.10f, 0.10f, 1.f), // Outline color
 		0.5f                                  // Outline thickness
 	);
+
+	static FText VertexPaintStatusToText(EMIForgeVertexPaintLayerStatus Status)
+	{
+		switch (Status)
+		{
+		case EMIForgeVertexPaintLayerStatus::Valid:
+			return FText::FromString(TEXT("Ready"));
+
+		case EMIForgeVertexPaintLayerStatus::Warning:
+			return FText::FromString(TEXT("Warning"));
+
+		case EMIForgeVertexPaintLayerStatus::Error:
+			return FText::FromString(TEXT("Error"));
+
+		case EMIForgeVertexPaintLayerStatus::Empty:
+		default:
+			return FText::FromString(TEXT("Empty"));
+		}
+	}
+
+	static FSlateColor VertexPaintStatusToColor(
+		EMIForgeVertexPaintLayerStatus Status
+	)
+	{
+		switch (Status)
+		{
+		case EMIForgeVertexPaintLayerStatus::Valid:
+			return FSlateColor(FLinearColor(0.f, 1.f, 0.f, 1.0f));
+
+		case EMIForgeVertexPaintLayerStatus::Warning:
+			return FSlateColor(FLinearColor(1.0f, 0.75f, 0.0f, 1.0f));
+
+		case EMIForgeVertexPaintLayerStatus::Error:
+			return FSlateColor(FLinearColor(1.f, 0.0f, 0.0f, 1.0f));
+
+		case EMIForgeVertexPaintLayerStatus::Empty:
+		default:
+			return FSlateColor::UseForeground();
+		}
+	}
 }
 
 void SMainTabWidget::Construct(const FArguments& InArgs) {
@@ -800,7 +840,7 @@ TSharedRef<SWidget> SMainTabWidget::Page1()
 {
 	return SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot()
-		.FillWidth(3.0f)
+		.FillWidth(2.5f)
 		.Padding(5.0f)
 		[
 #pragma region "Left"
@@ -831,7 +871,7 @@ TSharedRef<SWidget> SMainTabWidget::Page1()
 			SNew(SSeparator)
 		]
 		+ SHorizontalBox::Slot()
-		.FillWidth(5.0f)
+		.FillWidth(5.5f)
 		[
 #pragma region "Right"
 			SNew(SVerticalBox)
@@ -1451,181 +1491,54 @@ TSharedRef<SWidget> SMainTabWidget::RightContentWidget()
 
 TSharedRef<SWidget> SMainTabWidget::StandardPresetPannel()
 {
-	return SNew(SVerticalBox)
-		+ SVerticalBox::Slot()
+	TSharedRef<SVerticalBox> MainContainer = SNew(SVerticalBox);
+
+	MainContainer->AddSlot()
 		.AutoHeight()
-		.Padding(1.0f)
+		.Padding(4.f)
 		[
-			SNew(SVerticalBox)
-				+ SVerticalBox::Slot()
-				.AutoHeight()
-				.Padding(4.f)
-				[
-					SNew(STextBlock)
-						.Text(FText::FromString(TEXT("Generate standard material instances. (ORM Workflow)")))
-						.ColorAndOpacity(FLinearColor(.15f, .15f, .15f, 1.f))
-						
-				]
-				+ SVerticalBox::Slot()
-				.AutoHeight()
-				.Padding(2.f)
+			SNew(STextBlock)
+				.Text(FText::FromString(TEXT("Generate Standard material instances. (ORM Workflow)")))
+				.ColorAndOpacity(FLinearColor(.15f, .15f, .15f, 1.f))
+		];
 
-				[
-					SNew(STextBlock)
-						.Text(FText::FromString(TEXT("Target Folder:")))
-						.Font(FCoreStyle::GetDefaultFontStyle("Regular", 12.5f))
-						
-				]
-				
-				+ SVerticalBox::Slot()
-				.AutoHeight()
-				.Padding(2.f)
-				[
-					SNew(SHorizontalBox)
-						+ SHorizontalBox::Slot()
-						.FillWidth(10.f)
-						.Padding(1.f)
-						[
-							SNew(SEditableTextBox)
-								.Text_Lambda([this]()
-									{
-										return FText::FromString(CurrentTargetPath);
-									})
-								.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type)
-									{
-										CurrentTargetPath = NewText.ToString();
-									})
-								.HintText(FText::FromString(TEXT("/Game/Folder/Subfolder")))
-								
-								
-						]
-						+ SHorizontalBox::Slot()
-						.AutoWidth()
-						[
-							SNew(SButton)
-								.ButtonStyle(&FAppStyle::Get().GetWidgetStyle<FButtonStyle>("SimpleButton"))
-								.OnClicked_Lambda([this]() {
-								MIForgeUtilities::CreatePathSelector(SharedThis(this), FOnPathSelected::CreateLambda([this](const FString& SelectedPath) {
-									CurrentTargetPath = SelectedPath;
-								}));
-								return FReply::Handled();
-									})
-								[
-									SNew(SImage)
-										.Image(FMIForgeStyle::Get().GetBrush("Panel.FolderSelection"))
-								]
-						]
-				]
-				+ SVerticalBox::Slot()
-				.AutoHeight()
-				.Padding(2.f)
-				[
-					SNew(SSeparator)
-				]
-				+ SVerticalBox::Slot()
-					.AutoHeight()
-					.Padding(2.f)
+	TargetFolderSection(MainContainer);
 
-					[
-						SNew(STextBlock)
-							.Text(FText::FromString(TEXT("Instance Options")))
-							.Font(FCoreStyle::GetDefaultFontStyle("Regular", 12.5f))
+	MainContainer->AddSlot()
+		.AutoHeight()
+		.Padding(2.f)
+		[
+			SNew(SSeparator)
+		];
 
-					]
-				+ SVerticalBox::Slot()
-				.AutoHeight()
-				.Padding(6.f)
-					[
-					SNew(SCheckBox)
-						.OnCheckStateChanged_Lambda([this](ECheckBoxState NewState)
-							{
-								this->bUseEmissiveTextures = (NewState == ECheckBoxState::Checked);
-								TexSetListView->RequestListRefresh();
-								RefreshFilteredTextureSets();
-								RefreshValidationSummary();
-							})
-						.IsChecked_Lambda([this]() -> ECheckBoxState
-							{
-								return this->bUseEmissiveTextures ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
-							})
-						[
-							SNew(STextBlock)
-								.Text(FText::FromString(TEXT("Use Emissive Texture(s) ")))
-						]
-					]
-				+ SVerticalBox::Slot()
-					.AutoHeight()
-					.Padding(6.f)
-					[
-						SNew(SCheckBox)
-							.OnCheckStateChanged_Lambda([this](ECheckBoxState NewState)
-								{
-									this->bUseDetailNormalTextures = (NewState == ECheckBoxState::Checked);
-									TexSetListView->RequestListRefresh();
-									RefreshFilteredTextureSets();
-									RefreshValidationSummary();
-								})
-							.IsChecked_Lambda([this]() -> ECheckBoxState
-								{
-									return this->bUseDetailNormalTextures ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
-								})
-							[
-								SNew(STextBlock)
-									.Text(FText::FromString(TEXT("Use Detail Normal Texture(s) ")))
-							]
-					]
-				+ SVerticalBox::Slot()
-					.AutoHeight()
-					.Padding(6.f)
-					[
-						SNew(SCheckBox)
-							.OnCheckStateChanged_Lambda([this](ECheckBoxState NewState)
-								{
-									this->bUseTriplanarProjection = (NewState == ECheckBoxState::Checked);
-								})	
-							.IsChecked_Lambda([this]() -> ECheckBoxState
-								{
-									return this->bUseTriplanarProjection ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
-								})
-							[
-								SNew(STextBlock)
-									.Text(FText::FromString(TEXT("Use Triplanar ")))
-							]
-					]
-				+ SVerticalBox::Slot()
-					.AutoHeight()
-					.Padding(2.f)
+	StandardMIOptionSection(MainContainer);
 
-					[
-						SNew(STextBlock)
-							.Text(FText::FromString(TEXT("If MI already exists:")))
-							.Font(FCoreStyle::GetDefaultFontStyle("Regular", 12.5f))
+	MainContainer->AddSlot()
+		.AutoHeight()
+		.Padding(2.f)
 
-					]
-				+ SVerticalBox::Slot()
-				.AutoHeight()
-				.Padding(5.f)
-					[
-						IfMIExistsOptionBlock()
-					]
-				+ SVerticalBox::Slot()
-				.AutoHeight()
-				.Padding(2.f)
+		[
+			SNew(STextBlock)
+				.Text(FText::FromString(TEXT("Instance Options")))
+				.Font(FCoreStyle::GetDefaultFontStyle("Regular", 12.5f))
+		];
 
-					[	
-						ValidationSummarySection()
-					]
-				+ SVerticalBox::Slot()
-				.FillHeight(12.f)
-				.Padding(10.f)
-				.HAlign(HAlign_Center)
-				.VAlign(VAlign_Center)
-					[
-						GenerateStandardMIButton()
-					]
-		]
-		
-		;
+	MainContainer->AddSlot()
+		.AutoHeight()
+		.Padding(2.f)
+		[
+			IfMIExistsOptionBlock()
+		];
+	MainContainer->AddSlot()
+		.AutoHeight()
+		.Padding(2.f)
+		[
+			ValidationSummarySection()
+		];
+
+	GenerateStandardMIButton(MainContainer);
+
+	return MainContainer;
 }
 
 TSharedRef<SWidget> SMainTabWidget::RGBmaskingPresetPannel()
@@ -1853,17 +1766,206 @@ TSharedRef<SWidget> SMainTabWidget::ValidationSummaryText()
 
 TSharedRef<SWidget> SMainTabWidget::VertexPaintValidationSummaryText()
 {
+	auto MakeSummaryLine =
+		[](TAttribute<FText> Text, TAttribute<FSlateColor> Color)
+		{
+			return SNew(STextBlock)
+				.Text(Text)
+				.ColorAndOpacity(Color)
+				.Font(FCoreStyle::GetDefaultFontStyle("Regular", 10.f));
+		};
+
 	return SNew(SVerticalBox)
 
 		+ SVerticalBox::Slot()
 		.AutoHeight()
 		[
 			SNew(STextBlock)
-				.Text_Lambda([this]()
-					{
-						return GetVertexPaintValidationSummaryText();
-					})
+				.Text(FText::FromString(TEXT("Vertex Paint Validation Summary: \n")))
+				.Font(FCoreStyle::GetDefaultFontStyle("Bold", 10.f))
+		]
 
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		[
+			MakeSummaryLine(
+				TAttribute<FText>::CreateLambda([this]()
+					{
+						return FText::Format(
+							FText::FromString(TEXT("Ready to generate: {0} \n")),
+							CurrentVertexPaintValidationSummary.bCanGenerate
+							? FText::FromString(TEXT("Yes"))
+							: FText::FromString(TEXT("No"))
+						);
+					}),
+				TAttribute<FSlateColor>::CreateLambda([this]()
+					{
+						return CurrentVertexPaintValidationSummary.bCanGenerate
+							? FSlateColor(FLinearColor(0.f, 1.f, 0.f, 1.0f))
+							: FSlateColor(FLinearColor(1.f, 0.f, 0.f, 1.0f));
+					})
+			)
+		]
+
+	+ SVerticalBox::Slot()
+		.AutoHeight()
+		[
+			MakeSummaryLine(
+				TAttribute<FText>::CreateLambda([this]()
+					{
+						return FText::Format(
+							FText::FromString(TEXT("Layers Assigned: {0} / 4")),
+							CurrentVertexPaintValidationSummary.AssignedLayerCount
+						);
+					}),
+				TAttribute<FSlateColor>::CreateLambda([this]()
+					{
+						return CurrentVertexPaintValidationSummary.AssignedLayerCount < 2
+							? FSlateColor(FLinearColor(1.f, 0.f, 0.f, 1.0f))
+							: FSlateColor::UseForeground();
+					})
+			)
+		]
+
+	+ SVerticalBox::Slot()
+		.AutoHeight()
+		[
+			MakeSummaryLine(
+				TAttribute<FText>::CreateLambda([this]()
+					{
+						return FText::Format(
+							FText::FromString(TEXT("Required Missing: {0}")),
+							CurrentVertexPaintValidationSummary.MissingRequiredTextureCount
+						);
+					}),
+				TAttribute<FSlateColor>::CreateLambda([this]()
+					{
+						return CurrentVertexPaintValidationSummary.MissingRequiredTextureCount > 0
+							? FSlateColor(FLinearColor(1.f, 0.f, 0.f, 1.0f))
+							: FSlateColor(FLinearColor(0.f, 1.f, 0.f, 1.0f));
+					})
+			)
+		]
+
+	+ SVerticalBox::Slot()
+		.AutoHeight()
+		[
+			MakeSummaryLine(
+				TAttribute<FText>::CreateLambda([this]()
+					{
+						return FText::Format(
+							FText::FromString(TEXT("Optional Missing: {0}")),
+							CurrentVertexPaintValidationSummary.MissingOptionalTextureCount
+						);
+					}),
+				TAttribute<FSlateColor>::CreateLambda([this]()
+					{
+						return CurrentVertexPaintValidationSummary.MissingOptionalTextureCount > 0
+							? FSlateColor(FLinearColor(1.0f, 0.75f, 0.0f, 1.0f))
+							: FSlateColor(FLinearColor(0.f, 1.f, 0.f, 1.0f));
+					})
+			)
+		]
+
+	+ SVerticalBox::Slot()
+		.AutoHeight()
+		[
+			MakeSummaryLine(
+				TAttribute<FText>::CreateLambda([this]()
+					{
+						return FText::Format(
+							FText::FromString(TEXT("Unrecognized Textures: {0} \n")),
+							CurrentVertexPaintValidationSummary.UnrecognizedTextureCount
+						);
+					}),
+				TAttribute<FSlateColor>::CreateLambda([this]()
+					{
+						return CurrentVertexPaintValidationSummary.UnrecognizedTextureCount > 0
+							? FSlateColor(FLinearColor(1.0f, 0.75f, 0.0f, 1.0f))
+							: FSlateColor(FLinearColor(0.f, 1.f, 0.f, 1.0f));
+					})
+			)
+		]
+
+
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		[
+			MakeSummaryLine(
+				TAttribute<FText>::CreateLambda([this]()
+					{
+						return FText::Format(
+							FText::FromString(TEXT("Base Layer: {0}")),
+							VertexPaintStatusToText(CurrentVertexPaintValidationSummary.BaseStatus)
+						);
+					}),
+				TAttribute<FSlateColor>::CreateLambda([this]()
+					{
+						return VertexPaintStatusToColor(
+							CurrentVertexPaintValidationSummary.BaseStatus
+						);
+					})
+			)
+		]
+
+	+ SVerticalBox::Slot()
+		.AutoHeight()
+		[
+			MakeSummaryLine(
+				TAttribute<FText>::CreateLambda([this]()
+					{
+						return FText::Format(
+							FText::FromString(TEXT("R Layer: {0}")),
+							VertexPaintStatusToText(CurrentVertexPaintValidationSummary.LayerRStatus)
+						);
+					}),
+				TAttribute<FSlateColor>::CreateLambda([this]()
+					{
+						return VertexPaintStatusToColor(
+							CurrentVertexPaintValidationSummary.LayerRStatus
+						);
+					})
+			)
+		]
+
+	+ SVerticalBox::Slot()
+		.AutoHeight()
+		[
+			MakeSummaryLine(
+				TAttribute<FText>::CreateLambda([this]()
+					{
+						return FText::Format(
+							FText::FromString(TEXT("G Layer: {0}")),
+							VertexPaintStatusToText(CurrentVertexPaintValidationSummary.LayerGStatus)
+						);
+					}),
+				TAttribute<FSlateColor>::CreateLambda([this]()
+					{
+						return VertexPaintStatusToColor(
+							CurrentVertexPaintValidationSummary.LayerGStatus
+						);
+					})
+			)
+		]
+
+	+ SVerticalBox::Slot()
+		.AutoHeight()
+		[
+			MakeSummaryLine(
+				TAttribute<FText>::CreateLambda([this]()
+					{
+						return FText::Format(
+							FText::FromString(TEXT("B Layer: {0}")),
+							VertexPaintStatusToText(CurrentVertexPaintValidationSummary.LayerBStatus)
+						);
+					}),
+				TAttribute<FSlateColor>::CreateLambda([this]()
+					{
+						return VertexPaintStatusToColor(
+							CurrentVertexPaintValidationSummary.LayerBStatus
+						);
+					})
+			)
 		];
 }
 
@@ -1933,119 +2035,126 @@ TSharedRef<SWidget> SMainTabWidget::ValidationSummarySection()
 		];
 }
 
-TSharedRef<SWidget> SMainTabWidget::GenerateStandardMIButton()
-{
-	return SNew(SButton)
-		.OnClicked_Lambda([this]() {
-		if (CurrentTargetPath.IsEmpty())
-		{
-			MIForgeUtilities::PrintWindow((TEXT("Please specify a target path for the generated material instances.")), EAppMsgType::Ok);
-			return FReply::Handled();
-		}
-		if (CurrentValidationSummary.SetsWithErrors > 0)
-		{
-			MIForgeUtilities::PrintWindow((TEXT("Please fix all the errors before proceeding. (See 'Validation Summary' or click on 'View Details' for more information)")), EAppMsgType::Ok);
-			return FReply::Handled();
-		}
-
-		FMIForgeGenerationOptions Options;
-
-		Options.Preset = EMIForgeGenerationPreset::Standard;
-
-		Options.TargetPath = CurrentTargetPath;
-		Options.MaterialInstanceParentPath = TEXT("/MIForge/MasterMaterialPresets/MM_Standard.MM_Standard");
-		Options.bUseEmissive = this->bUseEmissiveTextures;
-		Options.bUseDetailNormal = this->bUseDetailNormalTextures;
-		Options.bUseTriplanar = this->bUseTriplanarProjection;
-		Options.IfMIExists = this->CurrentIfMIExistsOption;
-
-		Options.TextureParameterNames.Add(EMIForgeTextureType::Albedo, FName(TEXT("Albedo")));
-		Options.TextureParameterNames.Add(EMIForgeTextureType::Normal, FName(TEXT("Normal")));
-		Options.TextureParameterNames.Add(EMIForgeTextureType::ORM, FName(TEXT("ORM")));
-		Options.TextureParameterNames.Add(EMIForgeTextureType::Emissive, FName(TEXT("Emissive")));
-		Options.TextureParameterNames.Add(EMIForgeTextureType::DetailNormal, FName(TEXT("Detail Normal")));
-
-		const TArray<TSharedPtr<FMIForgeTextureSet>> GenerationSets = BuildGenerationTextureSets();
-		FMIForgeMaterialInstanceGenerator Generator;
-		FMIForgeGenerationResult Result;
-
-		// Store target folder for navigation
-		FString TargetFolderPath = Options.TargetPath;
-
-		{
-			FScopedTransaction Transaction(LOCTEXT("GenerateMaterialInstances", "Generate Material Instances"));
-			Result = Generator.GenerateMaterialInstances(GenerationSets, Options);
-
-			if (Result.CreatedAssets.Num() > 0)
-			{
-				UMIForgeGenerationUndoRecord* UndoRecord =
-					NewObject<UMIForgeGenerationUndoRecord>(
-						GetTransientPackage(),
-						NAME_None,
-						RF_Transactional
-					);
-
-				for (UObject* CreatedAsset : Result.CreatedAssets)
+void SMainTabWidget::GenerateStandardMIButton(TSharedRef<SVerticalBox> Container)
+{	
+	Container->AddSlot()
+		.FillHeight(12.f)
+		.Padding(10.f)
+		.HAlign(HAlign_Center)
+		.VAlign(VAlign_Center)
+		[
+			SNew(SButton)
+				.OnClicked_Lambda([this]() {
+				if (CurrentTargetPath.IsEmpty())
 				{
-					if (IsValid(CreatedAsset))
+					MIForgeUtilities::PrintWindow((TEXT("Please specify a target path for the generated material instances.")), EAppMsgType::Ok);
+					return FReply::Handled();
+				}
+				if (CurrentValidationSummary.SetsWithErrors > 0)
+				{
+					MIForgeUtilities::PrintWindow((TEXT("Please fix all the errors before proceeding. (See 'Validation Summary' or click on 'View Details' for more information)")), EAppMsgType::Ok);
+					return FReply::Handled();
+				}
+
+				FMIForgeGenerationOptions Options;
+
+				Options.Preset = EMIForgeGenerationPreset::Standard;
+
+				Options.TargetPath = CurrentTargetPath;
+				Options.MaterialInstanceParentPath = TEXT("/MIForge/MasterMaterialPresets/MM_Standard.MM_Standard");
+				Options.bUseEmissive = this->bUseEmissiveTextures;
+				Options.bUseDetailNormal = this->bUseDetailNormalTextures;
+				Options.bUseTriplanar = this->bUseTriplanarProjection;
+				Options.IfMIExists = this->CurrentIfMIExistsOption;
+
+				Options.TextureParameterNames.Add(EMIForgeTextureType::Albedo, FName(TEXT("Albedo")));
+				Options.TextureParameterNames.Add(EMIForgeTextureType::Normal, FName(TEXT("Normal")));
+				Options.TextureParameterNames.Add(EMIForgeTextureType::ORM, FName(TEXT("ORM")));
+				Options.TextureParameterNames.Add(EMIForgeTextureType::Emissive, FName(TEXT("Emissive")));
+				Options.TextureParameterNames.Add(EMIForgeTextureType::DetailNormal, FName(TEXT("Detail Normal")));
+
+				const TArray<TSharedPtr<FMIForgeTextureSet>> GenerationSets = BuildGenerationTextureSets();
+				FMIForgeMaterialInstanceGenerator Generator;
+				FMIForgeGenerationResult Result;
+
+				// Store target folder for navigation
+				FString TargetFolderPath = Options.TargetPath;
+
+				{
+					FScopedTransaction Transaction(LOCTEXT("GenerateMaterialInstances", "Generate Material Instances"));
+					Result = Generator.GenerateMaterialInstances(GenerationSets, Options);
+
+					if (Result.CreatedAssets.Num() > 0)
 					{
-						UndoRecord->CreatedAssetPaths.AddUnique(FSoftObjectPath(CreatedAsset));
+						UMIForgeGenerationUndoRecord* UndoRecord =
+							NewObject<UMIForgeGenerationUndoRecord>(
+								GetTransientPackage(),
+								NAME_None,
+								RF_Transactional
+							);
+
+						for (UObject* CreatedAsset : Result.CreatedAssets)
+						{
+							if (IsValid(CreatedAsset))
+							{
+								UndoRecord->CreatedAssetPaths.AddUnique(FSoftObjectPath(CreatedAsset));
+							}
+						}
+
+						UndoRecord->Modify();
+						UndoRecord->bAssetsShouldExist = true;
+					}
+
+					if (Result.CreatedCount + Result.UpdatedCount == 0)
+					{
+						Transaction.Cancel();
 					}
 				}
 
-				UndoRecord->Modify();
-				UndoRecord->bAssetsShouldExist = true;
-			}
+				// Log messages
+				for (const FText& Message : Result.Messages)
+				{
+					FString MessageString = Message.ToString();
+					MIForgeUtilities::PrintLog(MessageString, ELogVerbosity::Error);
+				}
 
-			if (Result.CreatedCount + Result.UpdatedCount == 0)
-			{
-				Transaction.Cancel();
-			}
-		}
+				// Navigate to target folder (100% safe - never crashes)
+				if (Result.CreatedCount > 0 || Result.UpdatedCount > 0)
+				{
+					// Defer folder navigation to next frame for stability
+					FTSTicker::GetCoreTicker().AddTicker(
+						FTickerDelegate::CreateLambda([TargetFolderPath](float) -> bool
+							{
+								FContentBrowserModule& ContentBrowserModule =
+									FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
 
-		// Log messages
-		for (const FText& Message : Result.Messages)
-		{
-			FString MessageString = Message.ToString();
-			MIForgeUtilities::PrintLog(MessageString, ELogVerbosity::Error);
-		}
+								TArray<FString> FoldersToSync;
+								FoldersToSync.Add(TargetFolderPath);
 
-		// Navigate to target folder (100% safe - never crashes)
-		if (Result.CreatedCount > 0 || Result.UpdatedCount > 0)
-		{
-			// Defer folder navigation to next frame for stability
-			FTSTicker::GetCoreTicker().AddTicker(
-				FTickerDelegate::CreateLambda([TargetFolderPath](float) -> bool
-					{
-						FContentBrowserModule& ContentBrowserModule =
-							FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
+								// Navigate to folder - this is 100% crash-proof
+								ContentBrowserModule.Get().SyncBrowserToFolders(FoldersToSync, false, false);
 
-						TArray<FString> FoldersToSync;
-						FoldersToSync.Add(TargetFolderPath);
+								// Optional: Log success
+								UE_LOG(LogTemp, Log, TEXT("Navigated Content Browser to: %s"), *TargetFolderPath);
 
-						// Navigate to folder - this is 100% crash-proof
-						ContentBrowserModule.Get().SyncBrowserToFolders(FoldersToSync, false, false);
+								return false; // Single execution
+							}),
+						0.3f // Small delay for stability
+					);
+				}
 
-						// Optional: Log success
-						UE_LOG(LogTemp, Log, TEXT("Navigated Content Browser to: %s"), *TargetFolderPath);
+				MIForgeUtilities::PrintNotification(FText::FromString(
+					FString::Printf(TEXT("Material Instances Created: %d, Updated: %d, Skipped: %d, Failed: %d. "),
+						Result.CreatedCount, Result.UpdatedCount, Result.SkippedCount, Result.FailedCount)).ToString(), 5.f);
 
-						return false; // Single execution
-					}),
-				0.3f // Small delay for stability
-			);
-		}
+				return FReply::Handled();
+					})
 
-		MIForgeUtilities::PrintNotification(FText::FromString(
-			FString::Printf(TEXT("Material Instances Created: %d, Updated: %d, Skipped: %d, Failed: %d. "),
-				Result.CreatedCount, Result.UpdatedCount, Result.SkippedCount, Result.FailedCount)).ToString(), 5.f);
-
-		return FReply::Handled();
-			})
-
-		[
-			SNew(STextBlock)
-				.Text_Lambda([this]() { return this->GetMIReadyCount(); })
-				.Font(FCoreStyle::GetDefaultFontStyle("Bold", 13.0f))
+				[
+					SNew(STextBlock)
+						.Text_Lambda([this]() { return this->GetMIReadyCount(); })
+						.Font(FCoreStyle::GetDefaultFontStyle("Bold", 16.0f))
+				]
 		];
 }
 
@@ -2309,6 +2418,80 @@ void SMainTabWidget::TargetFolderSection(TSharedRef<SVerticalBox> Container)
 
 }
 
+void SMainTabWidget::StandardMIOptionSection(TSharedRef<SVerticalBox> Container)
+{
+	Container->AddSlot()
+		.AutoHeight()
+		.Padding(2.f)
+
+		[
+			SNew(STextBlock)
+				.Text(FText::FromString(TEXT("Instance Options")))
+				.Font(FCoreStyle::GetDefaultFontStyle("Regular", 12.5f))
+
+		];
+	Container->AddSlot()
+		.AutoHeight()
+		.Padding(6.f)
+		[
+			SNew(SCheckBox)
+				.OnCheckStateChanged_Lambda([this](ECheckBoxState NewState)
+					{
+						this->bUseEmissiveTextures = (NewState == ECheckBoxState::Checked);
+						TexSetListView->RequestListRefresh();
+						RefreshFilteredTextureSets();
+						RefreshValidationSummary();
+					})
+				.IsChecked_Lambda([this]() -> ECheckBoxState
+					{
+						return this->bUseEmissiveTextures ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+					})
+				[
+					SNew(STextBlock)
+						.Text(FText::FromString(TEXT("Use Emissive Texture(s) ")))
+				]
+		];
+	Container->AddSlot()
+		.AutoHeight()
+		.Padding(6.f)
+		[
+			SNew(SCheckBox)
+				.OnCheckStateChanged_Lambda([this](ECheckBoxState NewState)
+					{
+						this->bUseDetailNormalTextures = (NewState == ECheckBoxState::Checked);
+						TexSetListView->RequestListRefresh();
+						RefreshFilteredTextureSets();
+						RefreshValidationSummary();
+					})
+				.IsChecked_Lambda([this]() -> ECheckBoxState
+					{
+						return this->bUseDetailNormalTextures ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+					})
+				[
+					SNew(STextBlock)
+						.Text(FText::FromString(TEXT("Use Detail Normal Texture(s) ")))
+				]
+		];
+	Container->AddSlot()
+		.AutoHeight()
+		.Padding(6.f)
+		[
+			SNew(SCheckBox)
+				.OnCheckStateChanged_Lambda([this](ECheckBoxState NewState)
+					{
+						this->bUseTriplanarProjection = (NewState == ECheckBoxState::Checked);
+					})
+				.IsChecked_Lambda([this]() -> ECheckBoxState
+					{
+						return this->bUseTriplanarProjection ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+					})
+				[
+					SNew(STextBlock)
+						.Text(FText::FromString(TEXT("Use Triplanar ")))
+				]
+		];
+}
+
 void SMainTabWidget::RGBmaskingMIOptionSection(TSharedRef<SVerticalBox> Container)
 {
 	Container->AddSlot()
@@ -2413,7 +2596,7 @@ void SMainTabWidget::GenerateRGBmaskingMIButton(TSharedRef<SVerticalBox> Contain
 				Options.MaterialInstanceParentPath = TEXT("/MIForge/MasterMaterialPresets/MM_RGBmasking.MM_RGBmasking");
 				Options.bUseBaseORMTexture = this->bUseBaseORMTexture;
 				Options.bEnableEmissiveChannel = this->bEnableEmissiveChannel;
-				Options.bUseDetailNormal = this->bUseDetailNormalTextures;
+				Options.bUseDetailNormal = this->bUseDetailNormalTextureRGB;
 				
 				Options.IfMIExists = this->CurrentIfMIExistsOption;
 
@@ -2502,7 +2685,7 @@ void SMainTabWidget::GenerateRGBmaskingMIButton(TSharedRef<SVerticalBox> Contain
 				[
 					SNew(STextBlock)
 						.Text_Lambda([this]() { return this->GetMIReadyCount(); })
-						.Font(FCoreStyle::GetDefaultFontStyle("Bold", 13.0f))
+						.Font(FCoreStyle::GetDefaultFontStyle("Bold", 16.0f))
 				]
 		];
 }
@@ -2912,6 +3095,11 @@ void SMainTabWidget::VertexPaintingMIOptionSection(TSharedRef<SVerticalBox> Cont
 									);
 									return FReply::Unhandled();
 								}
+
+								VertexPaintLayerStack.BaseLayer.AssignedTextureSet.Reset();
+								VertexPaintLayerStack.LayerR.AssignedTextureSet.Reset();
+								VertexPaintLayerStack.LayerG.AssignedTextureSet.Reset();
+								VertexPaintLayerStack.LayerB.AssignedTextureSet.Reset();
 
 								VertexPaintLayerStack.BaseLayer.AssignedTextureSet = SelectedTextureSetItems[0];
 

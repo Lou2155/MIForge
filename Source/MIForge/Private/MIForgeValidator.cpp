@@ -241,61 +241,53 @@ FMIForgeVertexPaintLayerStackValidationResult FMIForgeValidator::ValidateVertexP
 		OneLayerResult.AssignedSetName = TextureSet.SetName;
 		Result.AssignedLayerCount++;
 
-		auto RequireTexture = [&OneLayerResult, &TextureSet, &bHasBlockingError](
-			EMIForgeTextureType Type
-			)
-			{
-				const FMIForgeTextureInfo* TextureInfo = TextureSet.Textures.Find(Type);
+		const FMIForgeTextureSetValidationResult SetResult =
+			ValidateVertexPaintSet(
+				TextureSet,
+				bIgnoreUnrecognizedTextures
+			);
 
-				if (!TextureInfo)
-				{
-					OneLayerResult.bCanGenerate = false;
-					OneLayerResult.Status = EMIForgeVertexPaintLayerStatus::Error;
+		OneLayerResult.MissingRequiredTextures =
+			SetResult.MissingRequiredTextures;
 
-					OneLayerResult.MissingRequiredTextures.Add({
-						TEXT(""),
-						Type,
-						true
-						});
+		OneLayerResult.MissingOptionalTextures =
+			SetResult.MissingOptionalTextures;
 
-					bHasBlockingError = true;
-				}
-		};
+		OneLayerResult.UnrecognizedTextures =
+			SetResult.UnrecognizedTextures;
 
-		auto OptionalTexture = [&OneLayerResult, &TextureSet](
-			EMIForgeTextureType Type
-			)
-			{
-				const FMIForgeTextureInfo* TextureInfo = TextureSet.Textures.Find(Type);
-				if (!TextureInfo)
-				{	
-					if (OneLayerResult.Status != EMIForgeVertexPaintLayerStatus::Error)
-					{
-						OneLayerResult.Status = EMIForgeVertexPaintLayerStatus::Warning;
-					}
-
-					OneLayerResult.MissingOptionalTextures.Add({
-						TEXT(""),
-						Type,
-						false
-						});
-				}
-		};
-
-		OneLayerResult.Status = EMIForgeVertexPaintLayerStatus::Valid;
-
-		RequireTexture(EMIForgeTextureType::Albedo);
-
-		OptionalTexture(EMIForgeTextureType::Normal);
-		OptionalTexture(EMIForgeTextureType::ORM);
-
-		if(Slot->Layer != EMIForgeVertexPaintLayer::LayerB)
+		if (Slot->Layer == EMIForgeVertexPaintLayer::LayerB)
 		{
-			OptionalTexture(EMIForgeTextureType::Height);
+			OneLayerResult.MissingOptionalTextures.RemoveAll(
+				[](const FMIForgeTextureRequirement& Requirement)
+				{
+					return Requirement.TextureType == EMIForgeTextureType::Height;
+				}
+			);
 		}
-		
+
+		OneLayerResult.bCanGenerate =
+			OneLayerResult.MissingRequiredTextures.Num() == 0;
+
+		if (!OneLayerResult.bCanGenerate)
+		{
+			OneLayerResult.Status = EMIForgeVertexPaintLayerStatus::Error;
+			bHasBlockingError = true;
+		}
+		else if (
+			OneLayerResult.MissingOptionalTextures.Num() > 0 ||
+			OneLayerResult.UnrecognizedTextures.Num() > 0
+			)
+		{
+			OneLayerResult.Status = EMIForgeVertexPaintLayerStatus::Warning;
+		}
+		else
+		{
+			OneLayerResult.Status = EMIForgeVertexPaintLayerStatus::Valid;
+		}
 
 		Result.LayerResults.Add(MoveTemp(OneLayerResult));
+
 	}
 
 	bool bBaseAndRLayerAssigned = true;
@@ -474,39 +466,43 @@ FMIForgeVertexPaintValidationSummary FMIForgeValidator::BuildVertexPaintLayerSta
 	FMIForgeVertexPaintValidationSummary Summary;
 
 	Summary.AssignedLayerCount = LayerStackResult.AssignedLayerCount;
+	Summary.bCanGenerate = LayerStackResult.bCanGenerate;
+	Summary.LayerResults = LayerStackResult.LayerResults;
 
 	for(const FMIForgeVertexPaintLayerValidationResult& lr : LayerStackResult.LayerResults)
 	{	
 		Summary.MissingRequiredTextureCount += lr.MissingRequiredTextures.Num();
 		Summary.MissingOptionalTextureCount += lr.MissingOptionalTextures.Num();
+		Summary.UnrecognizedTextureCount += lr.UnrecognizedTextures.Num();
 
-		if(lr.Layer == EMIForgeVertexPaintLayer::Base)
+		switch (lr.Layer)
 		{
-			Summary.BaseLayerMissingOptionalTextureCount = lr.MissingOptionalTextures.Num();
-			Summary.BaseLayerMissingRequiredTextureCount = lr.MissingRequiredTextures.Num();
+		case EMIForgeVertexPaintLayer::Base:
 			Summary.BaseStatus = lr.Status;
-		}
-		if(lr.Layer == EMIForgeVertexPaintLayer::LayerR)
-		{
-			Summary.LayerRMissingOptionalTextureCount = lr.MissingOptionalTextures.Num();
-			Summary.LayerRMissingRequiredTextureCount = lr.MissingRequiredTextures.Num();
+			if (lr.Status == EMIForgeVertexPaintLayerStatus::Error && lr.AssignedSetName == TEXT("Empty"))
+			{
+				Summary.BaseStatus = EMIForgeVertexPaintLayerStatus::Empty;
+			}
+			break;
+
+		case EMIForgeVertexPaintLayer::LayerR:
 			Summary.LayerRStatus = lr.Status;
-		}
-		if(lr.Layer == EMIForgeVertexPaintLayer::LayerG)
-		{
-			Summary.LayerGMissingOptionalTextureCount = lr.MissingOptionalTextures.Num();
-			Summary.LayerGMissingRequiredTextureCount = lr.MissingRequiredTextures.Num();
+			if (lr.Status == EMIForgeVertexPaintLayerStatus::Error && lr.AssignedSetName == TEXT("Empty"))
+			{
+				Summary.LayerRStatus = EMIForgeVertexPaintLayerStatus::Empty;
+			}
+			break;
+
+		case EMIForgeVertexPaintLayer::LayerG:
 			Summary.LayerGStatus = lr.Status;
-		}
-		if(lr.Layer == EMIForgeVertexPaintLayer::LayerB)
-		{
-			Summary.LayerBMissingOptionalTextureCount = lr.MissingOptionalTextures.Num();
-			Summary.LayerBMissingRequiredTextureCount = lr.MissingRequiredTextures.Num();
+			break;
+
+		case EMIForgeVertexPaintLayer::LayerB:
 			Summary.LayerBStatus = lr.Status;
+			break;
 		}
+
 	}
-	Summary.bCanGenerate = LayerStackResult.bCanGenerate;
-	Summary.LayerResults = LayerStackResult.LayerResults;
 	return Summary;
 }
 

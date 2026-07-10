@@ -22,6 +22,7 @@ void UMIForgeGenerationUndoRecord::PostTransacted(const FTransactionObjectEvent&
 
 	if (bAssetsShouldExist)
 	{
+		bDeleteQueued = false;  //redo is allowed to happen before the deferred undo-delete runs, but we have to cancel that pending delete to avoid deleting the assets that were just re-created.
 		return;
 	}
 
@@ -44,7 +45,13 @@ void UMIForgeGenerationUndoRecord::PostTransacted(const FTransactionObjectEvent&
 					return false;
 				}
 
-				if (UndoRecord->bAssetsShouldExist || !UndoRecord->bDeleteQueued) //If redo happened, bAssetsShouldExist == true, so skip deletion.|| If another path already cancelled the queued delete, skip deletion.
+				if (UndoRecord->bAssetsShouldExist) //If redo happened, bAssetsShouldExist == true, so skip deletion.
+				{
+					UndoRecord->bDeleteQueued = false; //redo is allowed to happen before the deferred undo-delete runs, but we have to cancel that pending delete to avoid deleting the assets that were just re-created.
+					return false;
+				}
+
+				if (!UndoRecord->bDeleteQueued) //If another path already cancelled the queued delete, skip deletion.
 				{
 					return false;
 				}

@@ -104,11 +104,13 @@ private:
 	TSharedRef<SWidget> ValidationSummaryText();
 	TSharedRef<SWidget> VertexPaintValidationSummaryText();
 	TSharedRef<SWidget> ValidationSummarySection();
-	TSharedRef<SWidget> GenerateStandardMIButton();
+	void GenerateStandardMIButton(TSharedRef<SVerticalBox> Container);
 
 	TSharedRef<SWidget> VertexPaintLayerSlotWidget(EMIForgeVertexPaintLayer Layer);
 
 	void TargetFolderSection(TSharedRef<SVerticalBox> Container);
+
+	void StandardMIOptionSection(TSharedRef<SVerticalBox> Container);
 
 	void RGBmaskingMIOptionSection(TSharedRef<SVerticalBox> Container);
 	void GenerateRGBmaskingMIButton(TSharedRef<SVerticalBox> Container);
