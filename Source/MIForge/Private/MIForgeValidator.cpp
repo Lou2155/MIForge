@@ -197,7 +197,7 @@ FMIForgeTextureSetValidationResult FMIForgeValidator::ValidateRGBSet(const FMIFo
 	return Result;
 }
 
-FMIForgeVertexPaintLayerStackValidationResult FMIForgeValidator::ValidateVertexPaintLayerStack(const FMIForgeVertexPaintLayerStack& LayerStack) const
+FMIForgeVertexPaintLayerStackValidationResult FMIForgeValidator::ValidateVertexPaintLayerStack(const FMIForgeVertexPaintLayerStack& LayerStack, bool bIgnoreUnrecognizedTextures) const
 {
 	FMIForgeVertexPaintLayerStackValidationResult Result;
 	bool bHasBlockingError = false;
@@ -288,7 +288,11 @@ FMIForgeVertexPaintLayerStackValidationResult FMIForgeValidator::ValidateVertexP
 
 		OptionalTexture(EMIForgeTextureType::Normal);
 		OptionalTexture(EMIForgeTextureType::ORM);
-		OptionalTexture(EMIForgeTextureType::Height);
+
+		if(Slot->Layer != EMIForgeVertexPaintLayer::LayerB)
+		{
+			OptionalTexture(EMIForgeTextureType::Height);
+		}
 		
 
 		Result.LayerResults.Add(MoveTemp(OneLayerResult));
@@ -319,6 +323,93 @@ FMIForgeVertexPaintLayerStackValidationResult FMIForgeValidator::ValidateVertexP
 
 	return Result;
 
+}
+
+FMIForgeTextureSetValidationResult FMIForgeValidator::ValidateVertexPaintSet(const FMIForgeTextureSet& TextureSet, bool bIgnoreUnrecognizedTextures) const
+{
+	FMIForgeTextureSetValidationResult Result;
+	Result.SetName = TextureSet.SetName;
+
+	auto Require = [&Result, &TextureSet](EMIForgeTextureType Type)
+		{
+			const FMIForgeTextureInfo* TextureInfo = TextureSet.Textures.Find(Type);
+
+			if (!TextureInfo)
+			{
+				Result.bCanGenerate = false;
+				Result.MissingRequiredTextures.Add({
+					TEXT(""),
+					Type,
+					true
+					});
+				return;
+			}
+
+			Result.SuccessfulAppliedTextures.Add({
+				TextureInfo->AssetName,
+				Type,
+				true
+				});
+		};
+
+	auto Optional = [&Result, &TextureSet](EMIForgeTextureType Type)
+		{
+			const FMIForgeTextureInfo* TextureInfo = TextureSet.Textures.Find(Type);
+
+			if (!TextureInfo)
+			{
+				Result.MissingOptionalTextures.Add({
+					TEXT(""),
+					Type,
+					false
+					});
+				return;
+			}
+
+			Result.SuccessfulAppliedTextures.Add({
+				TextureInfo->AssetName,
+				Type,
+				false
+				});
+		};
+
+	Require(EMIForgeTextureType::Albedo);
+	Optional(EMIForgeTextureType::Normal);
+	Optional(EMIForgeTextureType::ORM);
+	Optional(EMIForgeTextureType::Height);
+	
+
+	if (!bIgnoreUnrecognizedTextures)
+	{
+		for (const FMIForgeTextureInfo& UnknownTexture : TextureSet.UnrecognizedTextures)
+		{
+			Result.UnrecognizedTextures.Add({
+				UnknownTexture.AssetName,
+				EMIForgeTextureType::Unknown,
+				false
+				});
+		}
+
+		for (const TPair<EMIForgeTextureType, FMIForgeTextureInfo>& TexturePair : TextureSet.Textures)
+		{
+			const FMIForgeTextureInfo& TextureInfo = TexturePair.Value;
+
+			if (TextureInfo.TextureType == EMIForgeTextureType::Unknown ||
+				TextureInfo.TextureType == EMIForgeTextureType::RGB ||
+				TextureInfo.TextureType == EMIForgeTextureType::DetailNormal ||
+				TextureInfo.TextureType == EMIForgeTextureType::Emissive  )
+			{
+				Result.UnrecognizedTextures.Add({
+					TextureInfo.AssetName,
+					TextureInfo.TextureType,
+					false
+					});
+			}
+		}
+	}
+
+
+	return Result;
 }
 
 FMIForgeValidationSummary FMIForgeValidator::BuildSummaryFromTextureSets(const TArray<TSharedPtr<FMIForgeTextureSet>>& TextureSets, TFunctionRef<FMIForgeTextureSetValidationResult(const FMIForgeTextureSet&)> ValidateSet) const
@@ -382,8 +473,13 @@ FMIForgeVertexPaintValidationSummary FMIForgeValidator::BuildVertexPaintLayerSta
 {	
 	FMIForgeVertexPaintValidationSummary Summary;
 
+	Summary.AssignedLayerCount = LayerStackResult.AssignedLayerCount;
+
 	for(const FMIForgeVertexPaintLayerValidationResult& lr : LayerStackResult.LayerResults)
-	{
+	{	
+		Summary.MissingRequiredTextureCount += lr.MissingRequiredTextures.Num();
+		Summary.MissingOptionalTextureCount += lr.MissingOptionalTextures.Num();
+
 		if(lr.Layer == EMIForgeVertexPaintLayer::Base)
 		{
 			Summary.BaseLayerMissingOptionalTextureCount = lr.MissingOptionalTextures.Num();

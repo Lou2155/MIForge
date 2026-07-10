@@ -1372,7 +1372,16 @@ TSharedPtr<SHeaderRow> SMainTabWidget::SetupTexSetHeaderRow()
 					})
 		]
 		+SHeaderRow::Column(FName("Status")) // ID
-		.FillWidth(0.04f)
+		.FillWidth_Lambda([this]() {
+			if (CurrentPresetOption.IsValid() && *CurrentPresetOption == TEXT("Vertex Painting"))
+			{
+				return 0.08f;
+			}
+			else
+			{
+				return 0.04f;
+			}
+			})
 		.HAlignCell(HAlign_Center) 
 		.VAlignCell(VAlign_Center)
 		.HeaderContent()
@@ -3203,7 +3212,7 @@ void SMainTabWidget::RefreshValidationSummary()
 	else if (*CurrentPresetOption == TEXT("Vertex Painting"))
 	{
 		
-		CurrentVertexPaintValidationResult = Validator.ValidateVertexPaintLayerStack(VertexPaintLayerStack);
+		CurrentVertexPaintValidationResult = Validator.ValidateVertexPaintLayerStack(VertexPaintLayerStack, bIgnoreUnrecognizedTextures);
 
 		CurrentVertexPaintValidationSummary = Validator.BuildVertexPaintLayerStackSummary(CurrentVertexPaintValidationResult);
 	}

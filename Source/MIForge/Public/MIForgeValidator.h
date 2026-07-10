@@ -24,8 +24,14 @@ public:
 	) const;
 
     FMIForgeVertexPaintLayerStackValidationResult ValidateVertexPaintLayerStack(
-        const FMIForgeVertexPaintLayerStack& LayerStack
+        const FMIForgeVertexPaintLayerStack& LayerStack,
+        bool bIgnoreUnrecognizedTextures
     ) const;
+
+    FMIForgeTextureSetValidationResult ValidateVertexPaintSet(
+        const FMIForgeTextureSet& TextureSet,
+        bool bIgnoreUnrecognizedTextures
+	) const;
 
     FMIForgeValidationSummary BuildSummaryFromTextureSets(
         const TArray<TSharedPtr<FMIForgeTextureSet>>& TextureSets,
@@ -123,6 +129,28 @@ public:
         {
             return EMIForgeTextureSetStatus::Warning;
         }
+        return EMIForgeTextureSetStatus::Ready;
+	}
+
+    EMIForgeTextureSetStatus GetVertexPaintSetStatus(
+        const FMIForgeTextureSet& TextureSet,
+		bool bIgnoreUnrecognizedTextures
+    ) const
+    {
+        const FMIForgeTextureSetValidationResult Result =
+            ValidateVertexPaintSet(TextureSet, bIgnoreUnrecognizedTextures);
+
+        if (!Result.bCanGenerate)
+        {
+            return EMIForgeTextureSetStatus::Error;
+        }
+
+        if (Result.MissingOptionalTextures.Num() > 0 ||
+            Result.UnrecognizedTextures.Num() > 0)
+        {
+            return EMIForgeTextureSetStatus::Warning;
+        }
+
         return EMIForgeTextureSetStatus::Ready;
 	}
 

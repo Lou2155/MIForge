@@ -1229,7 +1229,7 @@ FMIForgeGenerationResult FMIForgeMaterialInstanceGenerator::GenerateVertexPaintM
 	))
 	{
 		if (bWasCreated && Resolution.MaterialInstance && IsValid(Resolution.MaterialInstance))
-		{
+		{	
 			TArray<UObject*> ObjectsToDelete;
 			ObjectsToDelete.Add(Resolution.MaterialInstance);
 

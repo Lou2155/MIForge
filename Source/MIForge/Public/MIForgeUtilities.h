@@ -30,6 +30,8 @@ public:
 
 	static void SafelyDeleteAssets(UObject* ObjectToDelete, bool bWasCreated, TArray<UObject*> CreatedAssets);
 
+	static void CloseOpenAssetEditors(const TArray<UObject*>& ObjectsToDelete);
+
 private:
 	//TextureCompressionSettings GetExpectedCompression(EMIForgeTextureType Type);
 };

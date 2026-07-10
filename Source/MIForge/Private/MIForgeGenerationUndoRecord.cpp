@@ -8,6 +8,8 @@
 #include "ObjectTools.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "UObject/Package.h"
+#include "Editor.h"
+#include "Subsystems/AssetEditorSubsystem.h"
 
 void UMIForgeGenerationUndoRecord::PostTransacted(const FTransactionObjectEvent& TransactionEvent)
 {
@@ -68,7 +70,7 @@ void UMIForgeGenerationUndoRecord::PostTransacted(const FTransactionObjectEvent&
 					);
 
 					if (AssetData.IsValid())
-					{
+					{	// Asset is valid and registered in the Asset Registry, so we can safely get it.
 						Asset = AssetData.GetAsset();
 
 						PackagePathToScan = FPackageName::GetLongPackagePath(
@@ -120,7 +122,9 @@ void UMIForgeGenerationUndoRecord::PostTransacted(const FTransactionObjectEvent&
 				}
 
 				if (ObjectsToDelete.Num() > 0)
-				{
+				{	
+					
+
 					// Important:
 					// Notify Asset Registry before DeleteObjectsUnchecked.
 					// In my case, skipping this will cause crash / stale registry state.

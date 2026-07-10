@@ -303,4 +303,24 @@ void MIForgeUtilities::SafelyDeleteAssets(UObject* ObjectToDelete, bool bWasCrea
 	}
 }
 
+void MIForgeUtilities::CloseOpenAssetEditors(const TArray<UObject*>& ObjectsToDelete)
+{
+	if (GEditor)
+	{
+		UAssetEditorSubsystem* AssetEditorSubsystem =
+			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>();
+
+		if (AssetEditorSubsystem)
+		{
+			for (UObject* Object : ObjectsToDelete)
+			{
+				if (Object && IsValid(Object) && !Object->IsUnreachable())
+				{
+					AssetEditorSubsystem->CloseAllEditorsForAsset(Object);
+				}
+			}
+		}
+	}
+}
+
 

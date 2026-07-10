@@ -95,7 +95,11 @@ TSharedRef<SWidget> STextureSetTableRow::GenerateWidgetForColumn(const FName& Co
 							}
 							else
 							{
-								return nullptr;
+								StatusResult =
+									FMIForgeValidator().GetVertexPaintSetStatus(
+										*TextureSets,
+										ParentTable->bIgnoreUnrecognizedTextures
+									);
 							}
 
 							if (StatusResult == FMIForgeValidator::EMIForgeTextureSetStatus::Ready)

@@ -261,6 +261,11 @@ struct FMIForgeVertexPaintLayerSlot
             AddedTypes.Add(TEXT("ORM"));
         }
 
+        if (AssignedTextureSet->Textures.Contains(EMIForgeTextureType::Height))
+        {
+            AddedTypes.Add(TEXT("Height"));
+        }
+
         return FString::Join(AddedTypes, TEXT(" / "));
 	}
 
@@ -332,6 +337,7 @@ struct FMIForgeVertexPaintLayerValidationResult
 
     TArray<FMIForgeTextureRequirement> MissingRequiredTextures;
     TArray<FMIForgeTextureRequirement> MissingOptionalTextures;
+	TArray<FMIForgeTextureRequirement> UnrecognizedTextures;
 };
 
 struct FMIForgeVertexPaintLayerStackValidationResult
@@ -343,22 +349,27 @@ struct FMIForgeVertexPaintLayerStackValidationResult
 };
 
 struct FMIForgeVertexPaintValidationSummary
-{
+{   
+    int32 AssignedLayerCount = 0;
+    int32 MissingRequiredTextureCount = 0;
+    int32 MissingOptionalTextureCount = 0;
+    int32 UnrecognizedTextureCount = 0;
+
     EMIForgeVertexPaintLayerStatus BaseStatus = EMIForgeVertexPaintLayerStatus::Empty;
-    int32 BaseLayerMissingRequiredTextureCount = 0;
-    int32 BaseLayerMissingOptionalTextureCount = 0;
+   /* int32 BaseLayerMissingRequiredTextureCount = 0;
+    int32 BaseLayerMissingOptionalTextureCount = 0;*/
 
     EMIForgeVertexPaintLayerStatus LayerRStatus = EMIForgeVertexPaintLayerStatus::Empty;
-    int32 LayerRMissingRequiredTextureCount = 0;
-    int32 LayerRMissingOptionalTextureCount = 0;
+    /*int32 LayerRMissingRequiredTextureCount = 0;
+    int32 LayerRMissingOptionalTextureCount = 0;*/
 
     EMIForgeVertexPaintLayerStatus LayerGStatus = EMIForgeVertexPaintLayerStatus::Empty;
-    int32 LayerGMissingRequiredTextureCount = 0;
-    int32 LayerGMissingOptionalTextureCount = 0;
+   /* int32 LayerGMissingRequiredTextureCount = 0;
+    int32 LayerGMissingOptionalTextureCount = 0;*/
 
     EMIForgeVertexPaintLayerStatus LayerBStatus = EMIForgeVertexPaintLayerStatus::Empty;
-    int32 LayerBMissingRequiredTextureCount = 0;
-    int32 LayerBMissingOptionalTextureCount = 0;
+  /*  int32 LayerBMissingRequiredTextureCount = 0;
+    int32 LayerBMissingOptionalTextureCount = 0;*/
 
     bool bCanGenerate = false;
     TArray<FMIForgeVertexPaintLayerValidationResult> LayerResults;
