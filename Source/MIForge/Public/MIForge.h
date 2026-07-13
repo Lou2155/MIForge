@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
+#include "MIForgeBatchAdjustMIParams/MIForgeBatchParameterTypes.h"
 
 class FMIForgeModule : public IModuleInterface
 {
@@ -26,12 +27,34 @@ public:
 	 void UnregisterTabSpawner();
 	 TSharedRef<SDockTab> OnSpawnMIForgeMainTab(const FSpawnTabArgs& SpawnTabArgs);
 
+
+	 void RegisterBatchParameterEditorTabSpawner();
+	 void UnregisterBatchParameterEditorTabSpawner();
+
+	 TSharedRef<SDockTab> OnSpawnBatchParameterEditorTab(
+		 const FSpawnTabArgs& SpawnTabArgs
+	 );
+
 #pragma endregion
 
+#pragma region BatchMIParamsAdjustor
+
+	 void RegisterActorContextMenu();
+	 
+#pragma endregion
 private:
 	TArray<FString> SelectedFolderPaths;
+	void OpenBatchParameterAdjusterFromSelection();
+
+	void OpenBatchParameterEditorTab(
+		const FMIForgeMaterialParentGroup& ChosenGroup
+	);
+	FMIForgeBatchParameterModel PendingBatchParameterModel;
+
 	
 public:
 	// Centralized IDs
 	static const FName MIForgeMainTabId;
+
+	static const FName MIForgeBatchParameterEditorTabId;
 };

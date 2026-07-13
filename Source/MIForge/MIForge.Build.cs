@@ -48,6 +48,10 @@ public class MIForge : ModuleRules
 				"MaterialEditor",
 				"ContentBrowser",
                 "Json",
+                "ToolMenus",
+                "LevelEditor",
+				"AppFramework",
+                "PropertyEditor",
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

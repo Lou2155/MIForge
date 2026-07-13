@@ -288,6 +288,7 @@
 /I "../Plugins/Editor/EditorScriptingUtilities/Source/EditorScriptingUtilities/Public"
 /I "../Intermediate/Build/Win64/UnrealEditor/Inc/StaticMeshEditor/UHT"
 /I "Editor/StaticMeshEditor/Public"
+/I "D:/UE5_Projects/MIForge_PluginDev/Plugins/MIForge/Intermediate/Build/Win64/UnrealEditor/Inc/MIForge/UHT"
 /I "D:/UE5_Projects/MIForge_PluginDev/Plugins/MIForge/Source"
 /I "D:/UE5_Projects/MIForge_PluginDev/Plugins/MIForge/Source/MIForge/Public"
 /I "D:/UE5_Projects/MIForge_PluginDev/Intermediate/Build/Win64/x64/MIForge_PluginDevEditor/Development/UnrealEd"
