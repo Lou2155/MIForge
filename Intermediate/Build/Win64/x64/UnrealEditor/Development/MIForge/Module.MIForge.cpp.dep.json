@@ -166,6 +166,9 @@
             "d:\\ue5_projects\\miforge_plugindev\\plugins\\miforge\\source\\miforge\\private\\miforgevalidator.cpp",
             "d:\\ue5_projects\\miforge_plugindev\\plugins\\miforge\\source\\miforge\\private\\miforgevertexpaintrecipemanager.cpp",
             "d:\\ue5_projects\\miforge_plugindev\\plugins\\miforge\\source\\miforge\\private\\popupwindowcreator.cpp",
+            "d:\\ue5_projects\\miforge_plugindev\\plugins\\miforge\\source\\miforge\\private\\tests\\miforgetextureclassifier.spec.cpp",
+            "d:\\ue5_projects\\miforge_plugindev\\plugins\\miforge\\source\\miforge\\private\\tests\\miforgetexturesetbuilder.spec.cpp",
+            "d:\\ue5_projects\\miforge_plugindev\\plugins\\miforge\\source\\miforge\\private\\tests\\miforgevalidator.spec.cpp",
             "d:\\ue5_projects\\miforge_plugindev\\plugins\\miforge\\source\\miforge\\private\\texturesettablerow.cpp",
             "d:\\ue5_projects\\miforge_plugindev\\plugins\\miforge\\source\\miforge\\private\\texturetablerow.cpp"
         ],

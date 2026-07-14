@@ -13,6 +13,7 @@
 			"MIForgeBatchParameterTypes.cpp.obj",
 			"MIForgeBatchParamModelBuilder.cpp.obj",
 			"MIForgeSelectionCollector.cpp.obj",
+			"SMIForgeBatchParameterEditor.cpp.obj",
 			"SMIForgeParentMtlGroupPicker.cpp.obj",
 			"MIForgeGenerationUndoRecord.cpp.obj",
 			"MIForgeMaterialInstanceGenerator.cpp.obj",

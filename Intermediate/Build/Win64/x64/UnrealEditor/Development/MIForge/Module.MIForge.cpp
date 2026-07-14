@@ -25,5 +25,8 @@
 #include "D:/UE5_Projects/MIForge_PluginDev/Plugins/MIForge/Source/MIForge/Private/MIForgeValidator.cpp"
 #include "D:/UE5_Projects/MIForge_PluginDev/Plugins/MIForge/Source/MIForge/Private/MIForgeVertexPaintRecipeManager.cpp"
 #include "D:/UE5_Projects/MIForge_PluginDev/Plugins/MIForge/Source/MIForge/Private/PopupWindowCreator.cpp"
+#include "D:/UE5_Projects/MIForge_PluginDev/Plugins/MIForge/Source/MIForge/Private/Tests/MIForgeTextureClassifier.spec.cpp"
+#include "D:/UE5_Projects/MIForge_PluginDev/Plugins/MIForge/Source/MIForge/Private/Tests/MIForgeTextureSetBuilder.spec.cpp"
+#include "D:/UE5_Projects/MIForge_PluginDev/Plugins/MIForge/Source/MIForge/Private/Tests/MIForgeValidator.spec.cpp"
 #include "D:/UE5_Projects/MIForge_PluginDev/Plugins/MIForge/Source/MIForge/Private/TextureSetTableRow.cpp"
 #include "D:/UE5_Projects/MIForge_PluginDev/Plugins/MIForge/Source/MIForge/Private/TextureTableRow.cpp"

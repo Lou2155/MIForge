@@ -28,6 +28,9 @@
 			"MIForgeValidator.cpp.obj",
 			"MIForgeVertexPaintRecipeManager.cpp.obj",
 			"PopupWindowCreator.cpp.obj",
+			"MIForgeTextureClassifier.spec.cpp.obj",
+			"MIForgeTextureSetBuilder.spec.cpp.obj",
+			"MIForgeValidator.spec.cpp.obj",
 			"TextureSetTableRow.cpp.obj",
 			"TextureTableRow.cpp.obj"
 		]
