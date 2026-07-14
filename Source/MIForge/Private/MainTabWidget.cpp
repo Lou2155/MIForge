@@ -2596,7 +2596,7 @@ void SMainTabWidget::GenerateRGBmaskingMIButton(TSharedRef<SVerticalBox> Contain
 				Options.MaterialInstanceParentPath = TEXT("/MIForge/MasterMaterialPresets/MM_RGBmasking.MM_RGBmasking");
 				Options.bUseBaseORMTexture = this->bUseBaseORMTexture;
 				Options.bEnableEmissiveChannel = this->bEnableEmissiveChannel;
-				Options.bUseDetailNormal = this->bUseDetailNormalTextureRGB;
+				Options.bUseDetailNormalTextureRGB = this->bUseDetailNormalTextureRGB;
 				
 				Options.IfMIExists = this->CurrentIfMIExistsOption;
 

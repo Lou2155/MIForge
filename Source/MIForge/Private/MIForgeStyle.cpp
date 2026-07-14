@@ -51,6 +51,7 @@ TSharedRef<FSlateStyleSet> FMIForgeStyle::CreateStyleSet()
 	StyleSet->Set("ListView.Row.Warning", new IMAGE_BRUSH(TEXT("Warning"), Icon16x16));
 	StyleSet->Set("ListView.Row.Reject", new IMAGE_BRUSH(TEXT("Reject"), Icon16x16));
 	StyleSet->Set("ListView.Row.Info", new IMAGE_BRUSH(TEXT("Info"), Icon16x16));
+	StyleSet->Set("MIForgeLogo.Compact", new IMAGE_BRUSH(TEXT("MIForgeLogo_Compact"), Icon36x36));
 	//SVG Icons
 	StyleSet->Set("Panel.FolderSelection", new IMAGE_BRUSH_SVG(TEXT("SelectFolder"), Icon16x16));
 	StyleSet->Set("Panel.RefreshButton", new IMAGE_BRUSH_SVG(TEXT("Refresh"), Icon16x16));

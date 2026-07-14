@@ -46,7 +46,7 @@ private: \
 public: \
 	DECLARE_CLASS2(UMIForgeSettings, UDeveloperSettings, COMPILED_IN_FLAGS(0 | CLASS_DefaultConfig | CLASS_Config), CASTCLASS_None, TEXT("/Script/MIForge"), Z_Construct_UClass_UMIForgeSettings_NoRegister) \
 	DECLARE_SERIALIZER(UMIForgeSettings) \
-	static const TCHAR* StaticConfigName() {return TEXT("MIForgeSettings");} \
+	static const TCHAR* StaticConfigName() {return TEXT("MIForge");} \
 
 
 

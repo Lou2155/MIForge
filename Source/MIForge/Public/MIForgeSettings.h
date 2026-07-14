@@ -28,7 +28,7 @@ struct FMIForgeTextureCompressionSettings
 	bool bSRGB = true;
 };
 
-UCLASS(Config = MIForgeSettings, DefaultConfig)
+UCLASS(Config = MIForge, DefaultConfig)
 class MIFORGE_API UMIForgeSettings : public UDeveloperSettings
 {
 	GENERATED_BODY()

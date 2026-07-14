@@ -74,7 +74,7 @@ void FMIForgeModule::MenuEntry(FMenuBuilder& MenuBuilder)
 	MenuBuilder.AddMenuEntry(
 		FText::FromString("Open MIForge Tab"),
 		FText::FromString("Open the MIForge tab to manage your assets."),
-		FSlateIcon(FMIForgeStyle::GetStyleSetName(), "Panel.FolderSelection"),
+		FSlateIcon(FMIForgeStyle::GetStyleSetName(), "MIForgeLogo.Compact"),
 		FExecuteAction::CreateLambda([this]()
 			{
 				FGlobalTabmanager::Get()->TryInvokeTab(MIForgeMainTabId);
@@ -85,7 +85,7 @@ void FMIForgeModule::MenuEntry(FMenuBuilder& MenuBuilder)
 	MenuBuilder.AddMenuEntry(
 		FText::FromString("Fix Texture Compression"),
 		FText::FromString("Fix the texture compression settings in the folder."),
-		FSlateIcon(),
+		FSlateIcon(FMIForgeStyle::GetStyleSetName(), "MIForgeLogo.Compact"),
 		FExecuteAction::CreateLambda([this]()
 			{
 				// Call the function to fix texture compression settings
@@ -99,6 +99,7 @@ void FMIForgeModule::RegisterTabSpawner() {
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(MIForgeMainTabId, 
 		FOnSpawnTab::CreateRaw(this, &FMIForgeModule::OnSpawnMIForgeMainTab))
 		.SetDisplayName(FText::FromString("MIForge"))
+		.SetIcon(FSlateIcon(FMIForgeStyle::GetStyleSetName(), "MIForgeLogo.Compact"))
 		.SetMenuType(ETabSpawnerMenuType::Hidden);
 }
 
@@ -129,6 +130,7 @@ void FMIForgeModule::RegisterBatchParameterEditorTabSpawner()
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(MIForgeBatchParameterEditorTabId,
 		FOnSpawnTab::CreateRaw(this, &FMIForgeModule::OnSpawnBatchParameterEditorTab))
 		.SetDisplayName(FText::FromString("MIForge Batch Parameter Editor"))
+		.SetIcon(FSlateIcon(FMIForgeStyle::GetStyleSetName(), "MIForgeLogo.Compact"))
 		.SetMenuType(ETabSpawnerMenuType::Hidden);
 }
 
@@ -166,7 +168,7 @@ void FMIForgeModule::RegisterActorContextMenu()
 				"MIForge_BatchAdjustMIParameters",
 				FText::FromString(TEXT("MIForge: Batch Adjust MI Parameters")),
 				FText::FromString(TEXT("Batch edit Material Instance parameters from selected viewport actors.")),
-				FSlateIcon(),
+				FSlateIcon(FMIForgeStyle::GetStyleSetName(), "MIForgeLogo.Compact"),
 				FUIAction(
 					FExecuteAction::CreateRaw(
 						this,

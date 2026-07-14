@@ -17,7 +17,7 @@ void EmptyLinkFunctionForGeneratedCodeMIForge_init() {}
 				nullptr,
 				0,
 				PKG_CompiledIn | 0x00000040,
-				0x48DA5B79,
+				0x9497EBB8,
 				0x4523D886,
 				METADATA_PARAMS(0, nullptr)
 			};
@@ -25,5 +25,5 @@ void EmptyLinkFunctionForGeneratedCodeMIForge_init() {}
 		}
 		return Z_Registration_Info_UPackage__Script_MIForge.OuterSingleton;
 	}
-	static FRegisterCompiledInInfo Z_CompiledInDeferPackage_UPackage__Script_MIForge(Z_Construct_UPackage__Script_MIForge, TEXT("/Script/MIForge"), Z_Registration_Info_UPackage__Script_MIForge, CONSTRUCT_RELOAD_VERSION_INFO(FPackageReloadVersionInfo, 0x48DA5B79, 0x4523D886));
+	static FRegisterCompiledInInfo Z_CompiledInDeferPackage_UPackage__Script_MIForge(Z_Construct_UPackage__Script_MIForge, TEXT("/Script/MIForge"), Z_Registration_Info_UPackage__Script_MIForge, CONSTRUCT_RELOAD_VERSION_INFO(FPackageReloadVersionInfo, 0x9497EBB8, 0x4523D886));
 PRAGMA_ENABLE_DEPRECATION_WARNINGS

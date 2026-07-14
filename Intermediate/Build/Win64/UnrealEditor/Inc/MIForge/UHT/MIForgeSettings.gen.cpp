@@ -238,7 +238,7 @@ UObject* (*const Z_Construct_UClass_UMIForgeSettings_Statics::DependentSingleton
 static_assert(UE_ARRAY_COUNT(Z_Construct_UClass_UMIForgeSettings_Statics::DependentSingletons) < 16);
 const UECodeGen_Private::FClassParams Z_Construct_UClass_UMIForgeSettings_Statics::ClassParams = {
 	&UMIForgeSettings::StaticClass,
-	"MIForgeSettings",
+	"MIForge",
 	&StaticCppClassTypeInfo,
 	DependentSingletons,
 	nullptr,
@@ -272,10 +272,10 @@ struct Z_CompiledInDeferFile_FID_UE5_Projects_MIForge_PluginDev_Plugins_MIForge_
 		{ FMIForgeTextureCompressionSettings::StaticStruct, Z_Construct_UScriptStruct_FMIForgeTextureCompressionSettings_Statics::NewStructOps, TEXT("MIForgeTextureCompressionSettings"), &Z_Registration_Info_UScriptStruct_FMIForgeTextureCompressionSettings, CONSTRUCT_RELOAD_VERSION_INFO(FStructReloadVersionInfo, sizeof(FMIForgeTextureCompressionSettings), 756354263U) },
 	};
 	static constexpr FClassRegisterCompiledInInfo ClassInfo[] = {
-		{ Z_Construct_UClass_UMIForgeSettings, UMIForgeSettings::StaticClass, TEXT("UMIForgeSettings"), &Z_Registration_Info_UClass_UMIForgeSettings, CONSTRUCT_RELOAD_VERSION_INFO(FClassReloadVersionInfo, sizeof(UMIForgeSettings), 623310702U) },
+		{ Z_Construct_UClass_UMIForgeSettings, UMIForgeSettings::StaticClass, TEXT("UMIForgeSettings"), &Z_Registration_Info_UClass_UMIForgeSettings, CONSTRUCT_RELOAD_VERSION_INFO(FClassReloadVersionInfo, sizeof(UMIForgeSettings), 301546310U) },
 	};
 };
-static FRegisterCompiledInInfo Z_CompiledInDeferFile_FID_UE5_Projects_MIForge_PluginDev_Plugins_MIForge_Source_MIForge_Public_MIForgeSettings_h__Script_MIForge_915230094(TEXT("/Script/MIForge"),
+static FRegisterCompiledInInfo Z_CompiledInDeferFile_FID_UE5_Projects_MIForge_PluginDev_Plugins_MIForge_Source_MIForge_Public_MIForgeSettings_h__Script_MIForge_2544668673(TEXT("/Script/MIForge"),
 	Z_CompiledInDeferFile_FID_UE5_Projects_MIForge_PluginDev_Plugins_MIForge_Source_MIForge_Public_MIForgeSettings_h__Script_MIForge_Statics::ClassInfo, UE_ARRAY_COUNT(Z_CompiledInDeferFile_FID_UE5_Projects_MIForge_PluginDev_Plugins_MIForge_Source_MIForge_Public_MIForgeSettings_h__Script_MIForge_Statics::ClassInfo),
 	Z_CompiledInDeferFile_FID_UE5_Projects_MIForge_PluginDev_Plugins_MIForge_Source_MIForge_Public_MIForgeSettings_h__Script_MIForge_Statics::ScriptStructInfo, UE_ARRAY_COUNT(Z_CompiledInDeferFile_FID_UE5_Projects_MIForge_PluginDev_Plugins_MIForge_Source_MIForge_Public_MIForgeSettings_h__Script_MIForge_Statics::ScriptStructInfo),
 	nullptr, 0);
