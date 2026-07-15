@@ -6,3 +6,12 @@ Saved/
 .vs/
 /Binaries
 /Intermediate
+Binaries/Win64/UnrealEditor-MIForge.patch_0.exe
+Binaries/Win64/UnrealEditor-MIForge.patch_0.pdb
+Intermediate/Build/Win64/UnrealEditor/Inc/MIForge/UHT/Timestamp
+Intermediate/Build/Win64/x64/UnrealEditor/Development/MIForge/LiveCodingInfo.json
+Intermediate/Build/Win64/x64/UnrealEditor/Development/MIForge/LiveCodingInfo.json.old
+Intermediate/Build/Win64/x64/UnrealEditor/Development/MIForge/Module.MIForge.cpp
+Intermediate/Build/Win64/x64/UnrealEditor/Development/MIForge/Module.MIForge.cpp.lc.dep.json
+Intermediate/Build/Win64/x64/UnrealEditor/Development/MIForge/Module.MIForge.cpp.lc.obj
+Intermediate/Build/Win64/x64/UnrealEditor/Development/MIForge/Module.MIForge.cpp.old
