@@ -25,7 +25,7 @@
 #include "IContentBrowserSingleton.h"
 #include "Widgets/Input/SSearchBox.h"
 #include "MIForgeTextureSetDropTarget.h"
-
+#include "Presets/MIForgePresetDefinitions.h"
 
 
 
@@ -78,6 +78,92 @@ namespace
 		case EMIForgeVertexPaintLayerStatus::Empty:
 		default:
 			return FSlateColor::UseForeground();
+		}
+	}
+}
+
+namespace
+{
+	//temporary material-definition adapter
+
+	static void ApplyMaterialPresetDefinition(const FMIForgeMaterialPresetDefinition& Definition, FMIForgeGenerationOptions& Options)
+	{
+		Options.Preset = Definition.Preset;
+		Options.MaterialInstanceParentPath = Definition.ParentMaterialPath;
+
+		Options.TextureParameterNames.Reset();
+
+		for(const FMIForgeTextureBinding& TextureBinding : Definition.TextureBindings)
+		{
+			Options.TextureParameterNames.Add(TextureBinding.TextureType, TextureBinding.ParameterName);
+		}
+
+		// Clear the legacy defaults so the definition becomes the true source.
+		Options.TriplanarParameterName = NAME_None;
+		Options.EmissiveParameterName = NAME_None;
+		Options.DetailNormalParameterName = NAME_None;
+		Options.BaseORMParameterName = NAME_None;
+		Options.EmissiveChannelParameterName = NAME_None;
+
+		for (const FMIForgeStaticSwitchBinding& Binding :
+			Definition.StaticSwitchBindings)
+		{
+			switch (Binding.PresetOption)
+			{
+			case EMIForgePresetOptions::UseTriplanar:
+				Options.TriplanarParameterName =
+					Binding.ParameterName;
+				break;
+
+			case EMIForgePresetOptions::UseEmissiveTexture:
+				Options.EmissiveParameterName =
+					Binding.ParameterName;
+				break;
+
+			case EMIForgePresetOptions::UseDetailNormalTexture:
+				Options.DetailNormalParameterName =
+					Binding.ParameterName;
+				break;
+
+			case EMIForgePresetOptions::UseBaseORM:
+				Options.BaseORMParameterName =
+					Binding.ParameterName;
+				break;
+
+			case EMIForgePresetOptions::EnableEmissiveChannel:
+				Options.EmissiveChannelParameterName =
+					Binding.ParameterName;
+				break;
+
+			case EMIForgePresetOptions::None:
+			default:
+				break;
+			}
+		}
+	}
+
+	static void ApplyVertexPaintPresetDefinition(
+		const FMIForgeVertexPaintPresetDefinition& Definition,
+		FMIForgeVertexPaintGenerationOptions& Options)
+	{
+		Options.MaterialInstanceParentPath = Definition.ParentMaterialPath;
+
+		Options.LayerTextureParameterNames.Reset();
+		Options.LayerEnabledParameterNames.Reset();
+
+		for (const FMIForgeVertexPaintLayerDefinition& Layer :
+			Definition.Layers)
+		{
+			Options.LayerTextureParameterNames.Add(
+				Layer.Layer,
+				Layer.TextureParameters);
+
+			if (!Layer.EnabledSwitchParameter.IsNone())
+			{
+				Options.LayerEnabledParameterNames.Add(
+					Layer.Layer,
+					Layer.EnabledSwitchParameter);
+			}
 		}
 	}
 }
