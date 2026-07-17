@@ -26,6 +26,7 @@
 #include "Widgets/Input/SSearchBox.h"
 #include "MIForgeTextureSetDropTarget.h"
 #include "Presets/MIForgePresetDefinitions.h"
+#include "Generation/MIForgeGenerationCoordinator.h"
 
 
 

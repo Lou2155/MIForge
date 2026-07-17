@@ -7,6 +7,7 @@
 #include "MIForgeTextureSetBuilder.h"
 #include "Presets/MIForgePresetDefinitions.h"
 
+
 namespace
 {
     struct FMIForgeTextureValidationRule
