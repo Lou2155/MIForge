@@ -9,33 +9,21 @@ namespace
 		const FMIForgeMaterialPresetDefinition& Definition,
 		EMIForgeTextureType TextureType)
 	{
-		return Definition.TextureBindings.FindByPredicate(
-			[TextureType](const FMIForgeTextureBinding& Binding)
-			{
-				return Binding.TextureType == TextureType;
-			});
+		return Definition.FindTextureBinding(TextureType);
 	}
 
 	const FMIForgeStaticSwitchBinding* FindSwitchBinding(
 		const FMIForgeMaterialPresetDefinition& Definition,
 		EMIForgePresetOptions Option)
 	{
-		return Definition.StaticSwitchBindings.FindByPredicate(
-			[Option](const FMIForgeStaticSwitchBinding& Binding)
-			{
-				return Binding.PresetOption == Option;
-			});
+		return Definition.FindStaticSwitchBinding(Option);
 	}
 
 	const FMIForgeVertexPaintLayerDefinition* FindLayer(
 		const FMIForgeVertexPaintPresetDefinition& Definition,
 		EMIForgeVertexPaintLayer Layer)
 	{
-		return Definition.Layers.FindByPredicate(
-			[Layer](const FMIForgeVertexPaintLayerDefinition& LayerDefinition)
-			{
-				return LayerDefinition.Layer == Layer;
-			});
+		return Definition.FindLayer(Layer);
 	}
 }
 
@@ -47,6 +35,32 @@ DEFINE_SPEC(
 
 	void FMIForgePresetDefinitionsSpec::Define()
 {
+	Describe("Lookup", [this]()
+		{
+			It("should find material definitions by preset", [this]()
+				{
+					const FMIForgeMaterialPresetDefinition* Standard =
+						FMIForgePresetDefinitions::FindMaterialPreset(
+							EMIForgeGenerationPreset::Standard);
+					const FMIForgeMaterialPresetDefinition* RGBMask =
+						FMIForgePresetDefinitions::FindMaterialPreset(
+							EMIForgeGenerationPreset::RGBMask);
+					const FMIForgeMaterialPresetDefinition* VertexPainting =
+						FMIForgePresetDefinitions::FindMaterialPreset(
+							EMIForgeGenerationPreset::VertexPainting);
+
+					TestTrue(
+						TEXT("Standard preset resolves to its definition"),
+						Standard == &FMIForgePresetDefinitions::GetStandard());
+					TestTrue(
+						TEXT("RGB Mask preset resolves to its definition"),
+						RGBMask == &FMIForgePresetDefinitions::GetRGBMask());
+					TestNull(
+						TEXT("Vertex Painting is not a material preset"),
+						VertexPainting);
+				});
+		});
+
 	Describe("Standard", [this]()
 		{
 			It("should describe the Standard material contract", [this]()

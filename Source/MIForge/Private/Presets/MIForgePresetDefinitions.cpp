@@ -96,3 +96,20 @@ const FMIForgeVertexPaintPresetDefinition& FMIForgePresetDefinitions::GetVertexP
 		}();
 	return Definition;
 }
+
+const FMIForgeMaterialPresetDefinition* FMIForgePresetDefinitions::FindMaterialPreset(EMIForgeGenerationPreset Preset)
+{
+	switch (Preset)
+	{
+	case EMIForgeGenerationPreset::Standard:
+		return &GetStandard();
+
+	case EMIForgeGenerationPreset::RGBMask:
+		return &GetRGBMask();
+
+	case EMIForgeGenerationPreset::VertexPainting:
+	default:
+		return nullptr;
+	}
+}
+

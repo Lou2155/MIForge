@@ -82,92 +82,6 @@ namespace
 	}
 }
 
-namespace
-{
-	//temporary material-definition adapter
-
-	static void ApplyMaterialPresetDefinition(const FMIForgeMaterialPresetDefinition& Definition, FMIForgeGenerationOptions& Options)
-	{
-		Options.Preset = Definition.Preset;
-		Options.MaterialInstanceParentPath = Definition.ParentMaterialPath;
-
-		Options.TextureParameterNames.Reset();
-
-		for(const FMIForgeTextureBinding& TextureBinding : Definition.TextureBindings)
-		{
-			Options.TextureParameterNames.Add(TextureBinding.TextureType, TextureBinding.ParameterName);
-		}
-
-		// Clear the legacy defaults so the definition becomes the true source.
-		Options.TriplanarParameterName = NAME_None;
-		Options.EmissiveParameterName = NAME_None;
-		Options.DetailNormalParameterName = NAME_None;
-		Options.BaseORMParameterName = NAME_None;
-		Options.EmissiveChannelParameterName = NAME_None;
-
-		for (const FMIForgeStaticSwitchBinding& Binding :
-			Definition.StaticSwitchBindings)
-		{
-			switch (Binding.PresetOption)
-			{
-			case EMIForgePresetOptions::UseTriplanar:
-				Options.TriplanarParameterName =
-					Binding.ParameterName;
-				break;
-
-			case EMIForgePresetOptions::UseEmissiveTexture:
-				Options.EmissiveParameterName =
-					Binding.ParameterName;
-				break;
-
-			case EMIForgePresetOptions::UseDetailNormalTexture:
-				Options.DetailNormalParameterName =
-					Binding.ParameterName;
-				break;
-
-			case EMIForgePresetOptions::UseBaseORM:
-				Options.BaseORMParameterName =
-					Binding.ParameterName;
-				break;
-
-			case EMIForgePresetOptions::EnableEmissiveChannel:
-				Options.EmissiveChannelParameterName =
-					Binding.ParameterName;
-				break;
-
-			case EMIForgePresetOptions::None:
-			default:
-				break;
-			}
-		}
-	}
-
-	static void ApplyVertexPaintPresetDefinition(
-		const FMIForgeVertexPaintPresetDefinition& Definition,
-		FMIForgeVertexPaintGenerationOptions& Options)
-	{
-		Options.MaterialInstanceParentPath = Definition.ParentMaterialPath;
-
-		Options.LayerTextureParameterNames.Reset();
-		Options.LayerEnabledParameterNames.Reset();
-
-		for (const FMIForgeVertexPaintLayerDefinition& Layer :
-			Definition.Layers)
-		{
-			Options.LayerTextureParameterNames.Add(
-				Layer.Layer,
-				Layer.TextureParameters);
-
-			if (!Layer.EnabledSwitchParameter.IsNone())
-			{
-				Options.LayerEnabledParameterNames.Add(
-					Layer.Layer,
-					Layer.EnabledSwitchParameter);
-			}
-		}
-	}
-}
-
 void SMainTabWidget::Construct(const FArguments& InArgs) {
 	FMIForgeAssetScanner Scanner;
 	FMIForgeTextureClassifier Classifier;
@@ -214,25 +128,27 @@ void SMainTabWidget::Construct(const FArguments& InArgs) {
 
 	// Initialize the vertex paint layer stack with default values
 #pragma region VertexPaintLayerStackInitialization
-	VertexPaintLayerStack.BaseLayer.Layer = EMIForgeVertexPaintLayer::Base;
-	VertexPaintLayerStack.BaseLayer.DisplayName = TEXT("Base Layer");
-	VertexPaintLayerStack.BaseLayer.ChannelName = TEXT("Base");
-	VertexPaintLayerStack.BaseLayer.bRequired = true;
+	const FMIForgeVertexPaintPresetDefinition&
+		VertexPaintDefinition =
+		FMIForgePresetDefinitions::GetVertexPaint();
 
-	VertexPaintLayerStack.LayerR.Layer = EMIForgeVertexPaintLayer::LayerR;
-	VertexPaintLayerStack.LayerR.DisplayName = TEXT("Layer 01 / R");
-	VertexPaintLayerStack.LayerR.ChannelName = TEXT("R");
-	VertexPaintLayerStack.LayerR.bRequired = true;
+	for (const FMIForgeVertexPaintLayerDefinition& LayerDefinition :
+		VertexPaintDefinition.Layers)
+	{
+		FMIForgeVertexPaintLayerSlot* Slot =
+			GetVertexPaintLayerSlot(LayerDefinition.Layer); //get VertexPaintlayerStack.layer
 
-	VertexPaintLayerStack.LayerG.Layer = EMIForgeVertexPaintLayer::LayerG;
-	VertexPaintLayerStack.LayerG.DisplayName = TEXT("Layer 02 / G");
-	VertexPaintLayerStack.LayerG.ChannelName = TEXT("G");
-	VertexPaintLayerStack.LayerG.bRequired = false;
+		if (!Slot)
+		{
+			continue;
+		}
 
-	VertexPaintLayerStack.LayerB.Layer = EMIForgeVertexPaintLayer::LayerB;
-	VertexPaintLayerStack.LayerB.DisplayName = TEXT("Layer 03 / B");
-	VertexPaintLayerStack.LayerB.ChannelName = TEXT("B");
-	VertexPaintLayerStack.LayerB.bRequired = false;
+		Slot->Layer = LayerDefinition.Layer;
+		Slot->DisplayName = LayerDefinition.DisplayName;
+		Slot->ChannelName = LayerDefinition.ChannelName;
+		Slot->bRequired = LayerDefinition.bRequired;
+	}
+
 #pragma endregion
 
 	AssetThumbnailPool = MakeShared<FAssetThumbnailPool>(64);
@@ -454,10 +370,7 @@ void SMainTabWidget::SelectTexturesInSet(const FMIForgeTextureSet& TextureSet)
 		{
 			SelectTextureType(EMIForgeTextureType::ORM);
 		}
-		if(bEnableEmissiveChannel)
-		{
-			SelectTextureType(EMIForgeTextureType::Emissive);
-		}
+		
 		if(bUseDetailNormalTextureRGB)
 		{
 			SelectTextureType(EMIForgeTextureType::DetailNormal);
@@ -518,10 +431,7 @@ void SMainTabWidget::UnselectTexturesInSet(const FMIForgeTextureSet& TextureSet)
 		{
 			UnselectTextureType(EMIForgeTextureType::ORM);
 		}
-		if (bEnableEmissiveChannel)
-		{
-			UnselectTextureType(EMIForgeTextureType::Emissive);
-		}
+	
 		if (bUseDetailNormalTextureRGB)
 		{
 			UnselectTextureType(EMIForgeTextureType::DetailNormal);
@@ -2145,19 +2055,11 @@ void SMainTabWidget::GenerateStandardMIButton(TSharedRef<SVerticalBox> Container
 				FMIForgeGenerationOptions Options;
 
 				Options.Preset = EMIForgeGenerationPreset::Standard;
-
 				Options.TargetPath = CurrentTargetPath;
-				Options.MaterialInstanceParentPath = TEXT("/MIForge/MasterMaterialPresets/MM_Standard.MM_Standard");
-				Options.bUseEmissive = this->bUseEmissiveTextures;
-				Options.bUseDetailNormal = this->bUseDetailNormalTextures;
-				Options.bUseTriplanar = this->bUseTriplanarProjection;
-				Options.IfMIExists = this->CurrentIfMIExistsOption;
-
-				Options.TextureParameterNames.Add(EMIForgeTextureType::Albedo, FName(TEXT("Albedo")));
-				Options.TextureParameterNames.Add(EMIForgeTextureType::Normal, FName(TEXT("Normal")));
-				Options.TextureParameterNames.Add(EMIForgeTextureType::ORM, FName(TEXT("ORM")));
-				Options.TextureParameterNames.Add(EMIForgeTextureType::Emissive, FName(TEXT("Emissive")));
-				Options.TextureParameterNames.Add(EMIForgeTextureType::DetailNormal, FName(TEXT("Detail Normal")));
+				Options.bUseEmissive = bUseEmissiveTextures;
+				Options.bUseDetailNormal = bUseDetailNormalTextures;
+				Options.bUseTriplanar = bUseTriplanarProjection;
+				Options.IfMIExists = CurrentIfMIExistsOption;
 
 				const TArray<TSharedPtr<FMIForgeTextureSet>> GenerationSets = BuildGenerationTextureSets();
 				FMIForgeMaterialInstanceGenerator Generator;
@@ -2677,20 +2579,12 @@ void SMainTabWidget::GenerateRGBmaskingMIButton(TSharedRef<SVerticalBox> Contain
 				FMIForgeGenerationOptions Options;
 
 				Options.Preset = EMIForgeGenerationPreset::RGBMask;
-
 				Options.TargetPath = CurrentTargetPath;
-				Options.MaterialInstanceParentPath = TEXT("/MIForge/MasterMaterialPresets/MM_RGBmasking.MM_RGBmasking");
-				Options.bUseBaseORMTexture = this->bUseBaseORMTexture;
-				Options.bEnableEmissiveChannel = this->bEnableEmissiveChannel;
-				Options.bUseDetailNormalTextureRGB = this->bUseDetailNormalTextureRGB;
-				
-				Options.IfMIExists = this->CurrentIfMIExistsOption;
-
-				Options.TextureParameterNames.Add(EMIForgeTextureType::Albedo, FName(TEXT("Albedo")));
-				Options.TextureParameterNames.Add(EMIForgeTextureType::Normal, FName(TEXT("Base Normal")));
-				Options.TextureParameterNames.Add(EMIForgeTextureType::RGB, FName(TEXT("RGB_Mask")));
-				Options.TextureParameterNames.Add(EMIForgeTextureType::ORM, FName(TEXT("ORM")));
-				Options.TextureParameterNames.Add(EMIForgeTextureType::DetailNormal, FName(TEXT("Detail Normal")));
+				Options.bUseBaseORMTexture = bUseBaseORMTexture;
+				Options.bEnableEmissiveChannel = bEnableEmissiveChannel;
+				Options.bUseDetailNormalTextureRGB =
+					bUseDetailNormalTextureRGB;
+				Options.IfMIExists = CurrentIfMIExistsOption;
 
 				const TArray<TSharedPtr<FMIForgeTextureSet>> GenerationSets = BuildGenerationTextureSets();
 				FMIForgeMaterialInstanceGenerator Generator;
@@ -2806,7 +2700,6 @@ void SMainTabWidget::GenerateVertexPaintMIButton(TSharedRef<SVerticalBox> Contai
 				FMIForgeVertexPaintGenerationOptions Options;
 
 				Options.TargetPath = CurrentTargetPath;
-				Options.MaterialInstanceParentPath = TEXT("/MIForge/MasterMaterialPresets/MM_VertexPainting.MM_VertexPainting");
 				Options.IfMIExists = this->CurrentIfMIExistsOption;
 
 				const FString RequestedMIName =
@@ -2830,36 +2723,6 @@ void SMainTabWidget::GenerateVertexPaintMIButton(TSharedRef<SVerticalBox> Contai
 
 					Options.MaterialInstanceName = RequestedMIName;
 				}
-
-				TMap<EMIForgeTextureType, FName> BaseLayerParameterNames;
-				BaseLayerParameterNames.Add(EMIForgeTextureType::Albedo, FName(TEXT("Layer01_Albedo")));
-				BaseLayerParameterNames.Add(EMIForgeTextureType::Normal, FName(TEXT("Layer01_Normal")));
-				BaseLayerParameterNames.Add(EMIForgeTextureType::ORM, FName(TEXT("Layer01_ORM")));
-				BaseLayerParameterNames.Add(EMIForgeTextureType::Height, FName(TEXT("Layer01_Height")));
-				Options.LayerTextureParameterNames.Add(EMIForgeVertexPaintLayer::Base, BaseLayerParameterNames);
-
-				TMap<EMIForgeTextureType, FName> LayerRParameterNames;
-				LayerRParameterNames.Add(EMIForgeTextureType::Albedo, FName(TEXT("Layer02_Albedo")));
-				LayerRParameterNames.Add(EMIForgeTextureType::Normal, FName(TEXT("Layer02_Normal")));
-				LayerRParameterNames.Add(EMIForgeTextureType::ORM, FName(TEXT("Layer02_ORM")));
-				LayerRParameterNames.Add(EMIForgeTextureType::Height, FName(TEXT("Layer02_Height")));
-				Options.LayerTextureParameterNames.Add(EMIForgeVertexPaintLayer::LayerR, LayerRParameterNames);
-
-				TMap<EMIForgeTextureType, FName> LayerGParameterNames;
-				LayerGParameterNames.Add(EMIForgeTextureType::Albedo, FName(TEXT("Layer03_Albedo")));
-				LayerGParameterNames.Add(EMIForgeTextureType::Normal, FName(TEXT("Layer03_Normal")));
-				LayerGParameterNames.Add(EMIForgeTextureType::ORM, FName(TEXT("Layer03_ORM")));
-				LayerGParameterNames.Add(EMIForgeTextureType::Height, FName(TEXT("Layer03_Height")));
-				Options.LayerTextureParameterNames.Add(EMIForgeVertexPaintLayer::LayerG, LayerGParameterNames);
-
-				TMap<EMIForgeTextureType, FName> LayerBParameterNames;
-				LayerBParameterNames.Add(EMIForgeTextureType::Albedo, FName(TEXT("Layer04_Albedo")));
-				LayerBParameterNames.Add(EMIForgeTextureType::Normal, FName(TEXT("Layer04_Normal")));
-				LayerBParameterNames.Add(EMIForgeTextureType::ORM, FName(TEXT("Layer04_ORM")));
-				Options.LayerTextureParameterNames.Add(EMIForgeVertexPaintLayer::LayerB, LayerBParameterNames);
-
-				Options.LayerEnabledParameterNames.Add(EMIForgeVertexPaintLayer::LayerG, FName(TEXT("Enable G Channel?")));
-				Options.LayerEnabledParameterNames.Add(EMIForgeVertexPaintLayer::LayerB, FName(TEXT("Enable B Channel?")));
 
 				FMIForgeMaterialInstanceGenerator Generator;
 				FMIForgeGenerationResult Result;

@@ -82,7 +82,6 @@ private:
 	bool ApplyVertexPaintLayerTextures(
 		UMaterialInstanceConstant* MaterialInstance,
 		const FMIForgeVertexPaintLayerSlot& LayerSlot,
-		const FMIForgeVertexPaintGenerationOptions& Options,
 		bool bLayerGEnabled,
 		bool bLayerBEnabled,
 		FText& OutError
@@ -91,7 +90,6 @@ private:
 	bool ApplyVertexPaintTexture(
 		UMaterialInstanceConstant* MaterialInstanceConstant,
 		const FMIForgeVertexPaintLayerSlot& LayerSlot,
-		const FMIForgeVertexPaintGenerationOptions& Options,
 		EMIForgeTextureType TextureType,
 		const TCHAR* DisplayName,
 		bool bRequired

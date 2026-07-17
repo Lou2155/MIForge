@@ -158,7 +158,6 @@ struct FMIForgeGenerationOptions
     EMIForgeGenerationPreset Preset = EMIForgeGenerationPreset::Standard;
 
     FString TargetPath;
-	FSoftObjectPath MaterialInstanceParentPath;
 
     EIfMIExistsOption IfMIExists = EIfMIExistsOption::Skip;
 
@@ -170,16 +169,6 @@ struct FMIForgeGenerationOptions
     bool bUseBaseORMTexture = true;
     bool bEnableEmissiveChannel = false;
     bool bUseDetailNormalTextureRGB = false;
-
-	TMap<EMIForgeTextureType, FName> TextureParameterNames; // Map of texture type to parameter name in the material instance
-
-	//static switch parameter names
-    FName TriplanarParameterName = FName(TEXT("UseTriplanar?"));
-    FName EmissiveParameterName = FName(TEXT("UseEmissiveTex?"));
-	FName DetailNormalParameterName = FName(TEXT("UseDetailNormal?"));
-
-	FName BaseORMParameterName = FName(TEXT("UseBaseORM?"));
-	FName EmissiveChannelParameterName = FName(TEXT("EnableEmissiveChannel?"));
     
 };
 
@@ -378,13 +367,10 @@ struct FMIForgeVertexPaintValidationSummary
 struct FMIForgeVertexPaintGenerationOptions
 {
     FString TargetPath;
-    FSoftObjectPath MaterialInstanceParentPath;
     EIfMIExistsOption IfMIExists = EIfMIExistsOption::Skip;
 
     FString MaterialInstanceName;
 
-    TMap<EMIForgeVertexPaintLayer, TMap<EMIForgeTextureType, FName>> LayerTextureParameterNames;
-    TMap<EMIForgeVertexPaintLayer, FName> LayerEnabledParameterNames;
 };
 
 struct FMIForgeVertexPaintRecipeLayer

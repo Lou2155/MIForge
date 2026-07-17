@@ -255,7 +255,37 @@ void FMIForgeValidatorSpec::Define()
 				ContainsRequirement(Result.MissingRequiredTextures, EMIForgeTextureType::ORM));
 		});
 
-		It("should treat enabled emissive and detail normal as optional", [this]()
+		It("should not require an Emissive texture when the Emissive Channel is enabled", [this]()
+		{
+			const FMIForgeTextureSet Set = MakeSet(
+				TEXT("Rock"),
+				{
+					EMIForgeTextureType::Albedo,
+					EMIForgeTextureType::Normal,
+					EMIForgeTextureType::RGB
+				}
+			);
+
+			const FMIForgeTextureSetValidationResult Result =
+				FMIForgeValidator().ValidateRGBSet(
+					Set,
+					false, // Base ORM
+					true,  // Emissive Channel
+					false, // Detail Normal
+					false  // Ignore unrecognized
+				);
+
+			TestTrue(TEXT("Can generate"), Result.bCanGenerate);
+			TestFalse(
+				TEXT("Emissive is not missing"),
+				ContainsRequirement(
+					Result.MissingOptionalTextures,
+					EMIForgeTextureType::Emissive)
+			);
+
+		});
+
+		It("should treat enabled Detail Normal as optional", [this]()
 		{
 			const FMIForgeTextureSet Set = MakeSet(
 				TEXT("Rock"),
@@ -264,19 +294,26 @@ void FMIForgeValidatorSpec::Define()
 					EMIForgeTextureType::Normal,
 					EMIForgeTextureType::RGB
 				});
-
 			const FMIForgeTextureSetValidationResult Result =
-				FMIForgeValidator().ValidateRGBSet(Set, false, true, true, false);
+				FMIForgeValidator().ValidateRGBSet(
+					Set,
+					false,
+					false,
+					true,
+					false
+				);
 
 			TestTrue(TEXT("Can generate"), Result.bCanGenerate);
-			TestEqual(TEXT("Missing optional count"), Result.MissingOptionalTextures.Num(), 2);
-			TestTrue(
-				TEXT("Missing Emissive"),
-				ContainsRequirement(Result.MissingOptionalTextures, EMIForgeTextureType::Emissive));
+			TestEqual(
+				TEXT("Missing optional count"),
+				Result.MissingOptionalTextures.Num(), 1);
 			TestTrue(
 				TEXT("Missing Detail Normal"),
-				ContainsRequirement(Result.MissingOptionalTextures, EMIForgeTextureType::DetailNormal));
+				ContainsRequirement(
+					Result.MissingOptionalTextures,
+					EMIForgeTextureType::DetailNormal));
 		});
+
 	});
 
 	Describe("ValidateVertexPaintSet", [this]()

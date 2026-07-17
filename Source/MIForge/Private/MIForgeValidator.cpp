@@ -5,201 +5,235 @@
 #include "MIForgeTypes.h"
 #include "MIForgeUtilities.h"
 #include "MIForgeTextureSetBuilder.h"
+#include "Presets/MIForgePresetDefinitions.h"
+
+namespace
+{
+    struct FMIForgeTextureValidationRule
+    {
+        EMIForgeTextureType TextureType =
+            EMIForgeTextureType::Unknown;
+
+        EMIForgeRequirement Requirement =
+            EMIForgeRequirement::Optional;
+
+        EMIForgePresetOptions PresetOption =
+            EMIForgePresetOptions::None;
+    };
+
+    struct FMIForgeValidationContext
+    {
+        TSet<EMIForgePresetOptions> EnabledOptions;
+
+        bool IsOptionEnabled(
+            EMIForgePresetOptions Option) const
+        {
+            return Option == EMIForgePresetOptions::None ||
+                EnabledOptions.Contains(Option);
+        }
+    };
+
+	static TArray<FMIForgeTextureValidationRule> BuildMaterialValidationRules(
+		const FMIForgeMaterialPresetDefinition& Definition)
+	{
+		TArray<FMIForgeTextureValidationRule> Rules;
+		Rules.Reserve(Definition.TextureBindings.Num());
+
+		for (const FMIForgeTextureBinding& Binding : Definition.TextureBindings)
+		{
+			Rules.Add({
+				Binding.TextureType,
+				Binding.Requirement,
+				Binding.PresetOption
+				});
+		}
+		return Rules;
+	}
+
+	static TArray<FMIForgeTextureValidationRule> BuildVertexPaintLayerValidationRules(
+		const FMIForgeVertexPaintLayerDefinition& LayerDefinition)
+	{
+		TArray<FMIForgeTextureValidationRule> Rules;
+
+		const EMIForgeTextureType OrderedTypes[] = {
+			EMIForgeTextureType::Albedo,
+			EMIForgeTextureType::Normal,
+			EMIForgeTextureType::ORM,
+			EMIForgeTextureType::Height
+		};
+
+		for (EMIForgeTextureType TextureType : OrderedTypes)
+		{
+			if (!LayerDefinition.TextureParameters.Contains(TextureType))
+			{
+				continue;
+			}
+
+			Rules.Add({
+				TextureType,
+				TextureType == EMIForgeTextureType::Albedo
+					? EMIForgeRequirement::Required
+					: EMIForgeRequirement::Optional,
+				EMIForgePresetOptions::None
+				});
+		}
+
+		return Rules;
+	}
+
+
+	static FMIForgeTextureSetValidationResult
+		ValidateTextureSetByRules(
+			const FMIForgeTextureSet& TextureSet,
+			const TArray<FMIForgeTextureValidationRule>& Rules,
+			const FMIForgeValidationContext& Context,
+			bool bIgnoreUnrecognizedTextures)
+	{	
+		FMIForgeTextureSetValidationResult Result;
+		Result.SetName = TextureSet.SetName;
+		Result.bCanGenerate = true;
+
+		TSet<EMIForgeTextureType> SupportedTypes;
+		SupportedTypes.Reserve(Rules.Num());
+
+		for (const FMIForgeTextureValidationRule& Rule : Rules)
+		{	
+			// Add before checking whether the rule is active.
+			// An inactive rule is still a supported texture type.
+
+			SupportedTypes.Add(Rule.TextureType);
+
+			const bool bRuleActive = Context.IsOptionEnabled(Rule.PresetOption);
+
+			if (!bRuleActive)
+			{
+				continue;
+			}
+
+			const bool bRequired = Rule.Requirement == EMIForgeRequirement::Required;
+
+			const FMIForgeTextureInfo* TextureInfo = TextureSet.Textures.Find(Rule.TextureType);
+
+			if (TextureInfo)
+			{
+				Result.SuccessfulAppliedTextures.Add({
+					TextureInfo->AssetName,
+					Rule.TextureType,
+					bRequired
+					});
+
+				continue;
+			}
+
+			FMIForgeTextureRequirement MissingTexture = {
+				TEXT(""),
+				Rule.TextureType,
+				bRequired
+			};
+
+			if (bRequired)
+			{
+				Result.bCanGenerate = false;
+				Result.MissingRequiredTextures.Add(MissingTexture);
+			}
+			else
+			{
+				Result.MissingOptionalTextures.Add(MissingTexture);
+			}
+		}
+
+
+		if (!bIgnoreUnrecognizedTextures)
+		{	
+			// Textures that were already classified as unknown.
+			for (const FMIForgeTextureInfo& UnknownTexture : TextureSet.UnrecognizedTextures)
+			{
+				Result.UnrecognizedTextures.Add({
+					UnknownTexture.AssetName,
+					EMIForgeTextureType::Unknown,
+					false
+				});
+			}
+
+			// Recognized MIForge texture types that are unsupported
+			// by this particular preset.
+			for (const TPair<EMIForgeTextureType, FMIForgeTextureInfo>& TexturePair : TextureSet.Textures)
+			{
+				if (SupportedTypes.Contains(TexturePair.Key))
+				{
+					continue;
+				}
+
+				Result.UnrecognizedTextures.Add({
+					TexturePair.Value.AssetName,
+					TexturePair.Key,
+					false
+					});
+			}
+		}
+
+		return Result;
+
+	}
+
+}
+
 
 FMIForgeTextureSetValidationResult FMIForgeValidator::ValidateStandardSet(const FMIForgeTextureSet& TextureSet, bool bUseEmissive, bool bUseDetailNormal, bool bIgnoreUnrecognizedTextures) const
 {
-	FMIForgeTextureSetValidationResult Result;
-	Result.SetName = TextureSet.SetName;
-
-	auto Require = [&Result, &TextureSet](EMIForgeTextureType Type)
-		{
-			const FMIForgeTextureInfo* TextureInfo = TextureSet.Textures.Find(Type);
-
-			if (!TextureInfo)
-			{
-				Result.bCanGenerate = false;
-				Result.MissingRequiredTextures.Add({
-					TEXT(""),
-					Type,
-					true
-					});
-				return;
-			}
-
-			Result.SuccessfulAppliedTextures.Add({
-				TextureInfo->AssetName,
-				Type,
-				true
-				});
-		};
-
-	auto Optional = [&Result, &TextureSet](EMIForgeTextureType Type)
-		{
-			const FMIForgeTextureInfo* TextureInfo = TextureSet.Textures.Find(Type);
-
-			if (!TextureInfo)
-			{
-				Result.MissingOptionalTextures.Add({
-					TEXT(""),
-					Type,
-					false
-					});
-				return;
-			}
-
-			Result.SuccessfulAppliedTextures.Add({
-				TextureInfo->AssetName,
-				Type,
-				false
-				});
-		};
-
-	Require(EMIForgeTextureType::Albedo);
-	Require(EMIForgeTextureType::Normal);
-	Require(EMIForgeTextureType::ORM);
+	FMIForgeValidationContext Context;
 
 	if (bUseEmissive)
 	{
-		Optional(EMIForgeTextureType::Emissive);
+		Context.EnabledOptions.Add(
+			EMIForgePresetOptions::UseEmissiveTexture);
 	}
 
 	if (bUseDetailNormal)
 	{
-		Optional(EMIForgeTextureType::DetailNormal);
+		Context.EnabledOptions.Add(
+			EMIForgePresetOptions::UseDetailNormalTexture);
 	}
 
-	if (!bIgnoreUnrecognizedTextures)
-	{
-		for (const FMIForgeTextureInfo& UnknownTexture : TextureSet.UnrecognizedTextures)
-		{
-			Result.UnrecognizedTextures.Add({
-				UnknownTexture.AssetName,
-				EMIForgeTextureType::Unknown,
-				false
-				});
-		}
-
-		for (const TPair<EMIForgeTextureType, FMIForgeTextureInfo>& TexturePair : TextureSet.Textures)
-		{
-			const FMIForgeTextureInfo& TextureInfo = TexturePair.Value;
-
-			if (TextureInfo.TextureType == EMIForgeTextureType::Unknown ||
-				TextureInfo.TextureType == EMIForgeTextureType::RGB ||
-				TextureInfo.TextureType == EMIForgeTextureType::Height)
-			{
-				Result.UnrecognizedTextures.Add({
-					TextureInfo.AssetName,
-					TextureInfo.TextureType,
-					false
-					});
-			}
-		}
-	}
-
-
-	return Result;
+	return ValidateTextureSetByRules(
+		TextureSet,
+		BuildMaterialValidationRules(
+			FMIForgePresetDefinitions::GetStandard()),
+		Context,
+		bIgnoreUnrecognizedTextures);
 
 }
 
 FMIForgeTextureSetValidationResult FMIForgeValidator::ValidateRGBSet(const FMIForgeTextureSet& TextureSet, bool bUseBaseORMTexture, bool bEnableEmissiveChannel, bool bUseDetailNormalTextureRGB, bool bIgnoreUnrecognizedTextures) const
-{
-	FMIForgeTextureSetValidationResult Result;
-	Result.SetName = TextureSet.SetName;
+{	
+	FMIForgeValidationContext Context;
 
-	auto Require = [&Result, &TextureSet](EMIForgeTextureType Type)
-		{
-			const FMIForgeTextureInfo* TextureInfo = TextureSet.Textures.Find(Type);
-
-			if (!TextureInfo)
-			{
-				Result.bCanGenerate = false;
-				Result.MissingRequiredTextures.Add({
-					TEXT(""),
-					Type,
-					true
-					});
-				return;
-			}
-
-			Result.SuccessfulAppliedTextures.Add({
-				TextureInfo->AssetName,
-				Type,
-				true
-				});
-		};
-
-	auto Optional = [&Result, &TextureSet](EMIForgeTextureType Type)
-		{
-			const FMIForgeTextureInfo* TextureInfo = TextureSet.Textures.Find(Type);
-
-			if (!TextureInfo)
-			{
-				Result.MissingOptionalTextures.Add({
-					TEXT(""),
-					Type,
-					false
-					});
-				return;
-			}
-
-			Result.SuccessfulAppliedTextures.Add({
-				TextureInfo->AssetName,
-				Type,
-				false
-				});
-		};
-	Require(EMIForgeTextureType::Albedo);
-	Require(EMIForgeTextureType::Normal);
-	Require(EMIForgeTextureType::RGB);
-
-	if(bUseBaseORMTexture)
+	if (bUseBaseORMTexture)
 	{
-		Require(EMIForgeTextureType::ORM);
+		Context.EnabledOptions.Add(
+			EMIForgePresetOptions::UseBaseORM);
 	}
 
-	if(bEnableEmissiveChannel)
+	if (bUseDetailNormalTextureRGB)
 	{
-		Optional(EMIForgeTextureType::Emissive);
+		Context.EnabledOptions.Add(
+			EMIForgePresetOptions::UseDetailNormalTexture);
 	}
 
-	if(bUseDetailNormalTextureRGB)
-	{
-		Optional(EMIForgeTextureType::DetailNormal);
-	}
-
-	if(!bIgnoreUnrecognizedTextures)
-	{
-		for (const FMIForgeTextureInfo& UnknownTexture : TextureSet.UnrecognizedTextures)
-		{
-			Result.UnrecognizedTextures.Add({
-				UnknownTexture.AssetName,
-				EMIForgeTextureType::Unknown,
-				false
-				});
-		}
-
-		for (const TPair<EMIForgeTextureType, FMIForgeTextureInfo>& TexturePair : TextureSet.Textures)
-		{
-			const FMIForgeTextureInfo& TextureInfo = TexturePair.Value;
-
-			if (TextureInfo.TextureType == EMIForgeTextureType::Unknown ||
-				TextureInfo.TextureType == EMIForgeTextureType::Height)
-			{
-				Result.UnrecognizedTextures.Add({
-					TextureInfo.AssetName,
-					TextureInfo.TextureType,
-					false
-					});
-			}
-		}
-	}
-
-	return Result;
+	return ValidateTextureSetByRules(
+		TextureSet,
+		BuildMaterialValidationRules(
+			FMIForgePresetDefinitions::GetRGBMask()),
+		Context,
+		bIgnoreUnrecognizedTextures);
 }
 
 FMIForgeVertexPaintLayerStackValidationResult FMIForgeValidator::ValidateVertexPaintLayerStack(const FMIForgeVertexPaintLayerStack& LayerStack, bool bIgnoreUnrecognizedTextures) const
 {
 	FMIForgeVertexPaintLayerStackValidationResult Result;
+
+	const FMIForgeVertexPaintPresetDefinition& Definition = FMIForgePresetDefinitions::GetVertexPaint();
+	
 	bool bHasBlockingError = false;
 
 	for (const FMIForgeVertexPaintLayerSlot* Slot : LayerStack.GetSlots())
@@ -209,17 +243,29 @@ FMIForgeVertexPaintLayerStackValidationResult FMIForgeValidator::ValidateVertexP
 			continue;
 		}
 
+		const FMIForgeVertexPaintLayerDefinition* LayerDefinition =
+			Definition.FindLayer(Slot->Layer);
+
+		if (!LayerDefinition)
+		{
+			bHasBlockingError = true;
+			Result.bCanGenerate = false;
+			return Result;
+		}
+
 		FMIForgeVertexPaintLayerValidationResult OneLayerResult;
-		OneLayerResult.Layer = Slot->Layer;
-		OneLayerResult.DisplayName = Slot->DisplayName;
-		OneLayerResult.bRequired = Slot->bRequired;
+
+		
+		OneLayerResult.Layer = LayerDefinition->Layer;
+		OneLayerResult.DisplayName = LayerDefinition->DisplayName;
+		OneLayerResult.bRequired = LayerDefinition->bRequired;
 
 		if (!Slot->AssignedTextureSet.IsValid())
 		{
 			OneLayerResult.AssignedSetName = TEXT("Empty");
 			OneLayerResult.Status = EMIForgeVertexPaintLayerStatus::Empty;
 
-			if (Slot->bRequired)
+			if (OneLayerResult.bRequired)
 			{
 				OneLayerResult.bCanGenerate = false;
 				OneLayerResult.Status = EMIForgeVertexPaintLayerStatus::Error;
@@ -242,10 +288,11 @@ FMIForgeVertexPaintLayerStackValidationResult FMIForgeValidator::ValidateVertexP
 		Result.AssignedLayerCount++;
 
 		const FMIForgeTextureSetValidationResult SetResult =
-			ValidateVertexPaintSet(
+			ValidateTextureSetByRules(
 				TextureSet,
-				bIgnoreUnrecognizedTextures
-			);
+				BuildVertexPaintLayerValidationRules(*LayerDefinition),
+				FMIForgeValidationContext(),
+				bIgnoreUnrecognizedTextures);
 
 		OneLayerResult.MissingRequiredTextures =
 			SetResult.MissingRequiredTextures;
@@ -256,15 +303,6 @@ FMIForgeVertexPaintLayerStackValidationResult FMIForgeValidator::ValidateVertexP
 		OneLayerResult.UnrecognizedTextures =
 			SetResult.UnrecognizedTextures;
 
-		if (Slot->Layer == EMIForgeVertexPaintLayer::LayerB)
-		{
-			OneLayerResult.MissingOptionalTextures.RemoveAll(
-				[](const FMIForgeTextureRequirement& Requirement)
-				{
-					return Requirement.TextureType == EMIForgeTextureType::Height;
-				}
-			);
-		}
 
 		OneLayerResult.bCanGenerate =
 			OneLayerResult.MissingRequiredTextures.Num() == 0;
@@ -318,90 +356,20 @@ FMIForgeVertexPaintLayerStackValidationResult FMIForgeValidator::ValidateVertexP
 }
 
 FMIForgeTextureSetValidationResult FMIForgeValidator::ValidateVertexPaintSet(const FMIForgeTextureSet& TextureSet, bool bIgnoreUnrecognizedTextures) const
-{
-	FMIForgeTextureSetValidationResult Result;
-	Result.SetName = TextureSet.SetName;
+{	
+	const FMIForgeVertexPaintPresetDefinition& Definition =
+		FMIForgePresetDefinitions::GetVertexPaint();
 
-	auto Require = [&Result, &TextureSet](EMIForgeTextureType Type)
-		{
-			const FMIForgeTextureInfo* TextureInfo = TextureSet.Textures.Find(Type);
-
-			if (!TextureInfo)
-			{
-				Result.bCanGenerate = false;
-				Result.MissingRequiredTextures.Add({
-					TEXT(""),
-					Type,
-					true
-					});
-				return;
-			}
-
-			Result.SuccessfulAppliedTextures.Add({
-				TextureInfo->AssetName,
-				Type,
-				true
-				});
-		};
-
-	auto Optional = [&Result, &TextureSet](EMIForgeTextureType Type)
-		{
-			const FMIForgeTextureInfo* TextureInfo = TextureSet.Textures.Find(Type);
-
-			if (!TextureInfo)
-			{
-				Result.MissingOptionalTextures.Add({
-					TEXT(""),
-					Type,
-					false
-					});
-				return;
-			}
-
-			Result.SuccessfulAppliedTextures.Add({
-				TextureInfo->AssetName,
-				Type,
-				false
-				});
-		};
-
-	Require(EMIForgeTextureType::Albedo);
-	Optional(EMIForgeTextureType::Normal);
-	Optional(EMIForgeTextureType::ORM);
-	Optional(EMIForgeTextureType::Height);
-	
-
-	if (!bIgnoreUnrecognizedTextures)
-	{
-		for (const FMIForgeTextureInfo& UnknownTexture : TextureSet.UnrecognizedTextures)
-		{
-			Result.UnrecognizedTextures.Add({
-				UnknownTexture.AssetName,
-				EMIForgeTextureType::Unknown,
-				false
-				});
-		}
-
-		for (const TPair<EMIForgeTextureType, FMIForgeTextureInfo>& TexturePair : TextureSet.Textures)
-		{
-			const FMIForgeTextureInfo& TextureInfo = TexturePair.Value;
-
-			if (TextureInfo.TextureType == EMIForgeTextureType::Unknown ||
-				TextureInfo.TextureType == EMIForgeTextureType::RGB ||
-				TextureInfo.TextureType == EMIForgeTextureType::DetailNormal ||
-				TextureInfo.TextureType == EMIForgeTextureType::Emissive  )
-			{
-				Result.UnrecognizedTextures.Add({
-					TextureInfo.AssetName,
-					TextureInfo.TextureType,
-					false
-					});
-			}
-		}
-	}
+	const FMIForgeVertexPaintLayerDefinition* BaseDefinition =
+		Definition.FindLayer(EMIForgeVertexPaintLayer::Base);
 
 
-	return Result;
+	return ValidateTextureSetByRules(
+		TextureSet,
+		BuildVertexPaintLayerValidationRules(
+			*BaseDefinition),
+		FMIForgeValidationContext(),
+		bIgnoreUnrecognizedTextures);
 }
 
 FMIForgeValidationSummary FMIForgeValidator::BuildSummaryFromTextureSets(const TArray<TSharedPtr<FMIForgeTextureSet>>& TextureSets, TFunctionRef<FMIForgeTextureSetValidationResult(const FMIForgeTextureSet&)> ValidateSet) const

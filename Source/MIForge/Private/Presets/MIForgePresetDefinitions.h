@@ -27,6 +27,7 @@ struct FMIForgeTextureBinding
 	FName ParameterName;
 	EMIForgeRequirement Requirement;
 	EMIForgePresetOptions PresetOption = EMIForgePresetOptions::None;
+
 };
 
 struct FMIForgeStaticSwitchBinding
@@ -42,6 +43,26 @@ struct FMIForgeMaterialPresetDefinition
 
 	TArray<FMIForgeTextureBinding> TextureBindings;
 	TArray<FMIForgeStaticSwitchBinding> StaticSwitchBindings;
+
+	const FMIForgeTextureBinding* FindTextureBinding(
+		EMIForgeTextureType TextureType) const
+	{
+		return TextureBindings.FindByPredicate(
+			[TextureType](const FMIForgeTextureBinding& Binding)
+			{
+				return Binding.TextureType == TextureType;
+			});
+	}
+
+	const FMIForgeStaticSwitchBinding* FindStaticSwitchBinding(
+		EMIForgePresetOptions Option) const
+	{
+		return StaticSwitchBindings.FindByPredicate(
+			[Option](const FMIForgeStaticSwitchBinding& Binding)
+			{
+				return Binding.PresetOption == Option;
+			});
+	}
 };
 
 struct FMIForgeVertexPaintLayerDefinition
@@ -61,6 +82,17 @@ struct FMIForgeVertexPaintPresetDefinition
 {
 	FSoftObjectPath ParentMaterialPath;
 	TArray<FMIForgeVertexPaintLayerDefinition> Layers;
+
+	const FMIForgeVertexPaintLayerDefinition* FindLayer(
+		EMIForgeVertexPaintLayer Layer) const
+	{
+		return Layers.FindByPredicate(
+			[Layer](const FMIForgeVertexPaintLayerDefinition& Definition)
+			{
+				return Definition.Layer == Layer;
+			});
+	}
+
 };
 
 class FMIForgePresetDefinitions
@@ -69,4 +101,7 @@ public:
 	static const FMIForgeMaterialPresetDefinition& GetStandard();
 	static const FMIForgeMaterialPresetDefinition& GetRGBMask();
 	static const FMIForgeVertexPaintPresetDefinition& GetVertexPaint();
+
+	static const FMIForgeMaterialPresetDefinition* FindMaterialPreset(EMIForgeGenerationPreset Preset);
 };
+
