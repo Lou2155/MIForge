@@ -13,16 +13,11 @@
 #include "TextureTableRow.h" 
 #include "TextureSetTableRow.h"
 #include "MIForgeValidator.h"
-#include "MIForgeMaterialInstanceGenerator.h"
 #include "EditorAssetLibrary.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Containers/Ticker.h"
 #include "MIForgeStyle.h"
 #include "PopupWindowCreator.h"
-#include "ScopedTransaction.h"
-#include "MIForgeGenerationUndoRecord.h"
-#include "ContentBrowserModule.h"
-#include "IContentBrowserSingleton.h"
 #include "Widgets/Input/SSearchBox.h"
 #include "MIForgeTextureSetDropTarget.h"
 #include "Presets/MIForgePresetDefinitions.h"
@@ -2053,88 +2048,20 @@ void SMainTabWidget::GenerateStandardMIButton(TSharedRef<SVerticalBox> Container
 					return FReply::Handled();
 				}
 
-				FMIForgeGenerationOptions Options;
+				FMIForgeMaterialGenerationRequest Request;
 
-				Options.Preset = EMIForgeGenerationPreset::Standard;
-				Options.TargetPath = CurrentTargetPath;
-				Options.bUseEmissive = bUseEmissiveTextures;
-				Options.bUseDetailNormal = bUseDetailNormalTextures;
-				Options.bUseTriplanar = bUseTriplanarProjection;
-				Options.IfMIExists = CurrentIfMIExistsOption;
+				Request.TextureSets = BuildGenerationTextureSets();
+				Request.Options.Preset = EMIForgeGenerationPreset::Standard;
+				Request.Options.TargetPath = CurrentTargetPath;
+				Request.Options.bUseEmissive = bUseEmissiveTextures;
+				Request.Options.bUseDetailNormal = bUseDetailNormalTextures;
+				Request.Options.bUseTriplanar = bUseTriplanarProjection;
+				Request.Options.IfMIExists = CurrentIfMIExistsOption;
 
-				const TArray<TSharedPtr<FMIForgeTextureSet>> GenerationSets = BuildGenerationTextureSets();
-				FMIForgeMaterialInstanceGenerator Generator;
-				FMIForgeGenerationResult Result;
+				
+				const FMIForgeGenerationOutcome Result = FMIForgeGenerationCoordinator().ExecuteMaterialGeneration(Request);
 
-				// Store target folder for navigation
-				FString TargetFolderPath = Options.TargetPath;
-
-				{
-					FScopedTransaction Transaction(LOCTEXT("GenerateMaterialInstances", "Generate Material Instances"));
-					Result = Generator.GenerateMaterialInstances(GenerationSets, Options);
-
-					if (Result.CreatedAssets.Num() > 0)
-					{
-						UMIForgeGenerationUndoRecord* UndoRecord =
-							NewObject<UMIForgeGenerationUndoRecord>(
-								GetTransientPackage(),
-								NAME_None,
-								RF_Transactional
-							);
-
-						for (UObject* CreatedAsset : Result.CreatedAssets)
-						{
-							if (IsValid(CreatedAsset))
-							{
-								UndoRecord->CreatedAssetPaths.AddUnique(FSoftObjectPath(CreatedAsset));
-							}
-						}
-
-						UndoRecord->Modify();
-						UndoRecord->bAssetsShouldExist = true;
-					}
-
-					if (Result.CreatedCount + Result.UpdatedCount == 0)
-					{
-						Transaction.Cancel();
-					}
-				}
-
-				// Log messages
-				for (const FText& Message : Result.Messages)
-				{
-					FString MessageString = Message.ToString();
-					MIForgeUtilities::PrintLog(MessageString, ELogVerbosity::Error);
-				}
-
-				// Navigate to target folder (100% safe - never crashes)
-				if (Result.CreatedCount > 0 || Result.UpdatedCount > 0)
-				{
-					// Defer folder navigation to next frame for stability
-					FTSTicker::GetCoreTicker().AddTicker(
-						FTickerDelegate::CreateLambda([TargetFolderPath](float) -> bool
-							{
-								FContentBrowserModule& ContentBrowserModule =
-									FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
-
-								TArray<FString> FoldersToSync;
-								FoldersToSync.Add(TargetFolderPath);
-
-								// Navigate to folder - this is 100% crash-proof
-								ContentBrowserModule.Get().SyncBrowserToFolders(FoldersToSync, false, false);
-
-								// Optional: Log success
-								UE_LOG(LogTemp, Log, TEXT("Navigated Content Browser to: %s"), *TargetFolderPath);
-
-								return false; // Single execution
-							}),
-						0.3f // Small delay for stability
-					);
-				}
-
-				MIForgeUtilities::PrintNotification(FText::FromString(
-					FString::Printf(TEXT("Material Instances Created: %d, Updated: %d, Skipped: %d, Failed: %d. "),
-						Result.CreatedCount, Result.UpdatedCount, Result.SkippedCount, Result.FailedCount)).ToString(), 5.f);
+				MIForgeUtilities::PrintNotification(Result.SummaryText.ToString(), 5.f);
 
 				return FReply::Handled();
 					})
@@ -2577,89 +2504,24 @@ void SMainTabWidget::GenerateRGBmaskingMIButton(TSharedRef<SVerticalBox> Contain
 					return FReply::Handled();
 				}
 
-				FMIForgeGenerationOptions Options;
+				FMIForgeMaterialGenerationRequest Request;
 
-				Options.Preset = EMIForgeGenerationPreset::RGBMask;
-				Options.TargetPath = CurrentTargetPath;
-				Options.bUseBaseORMTexture = bUseBaseORMTexture;
-				Options.bEnableEmissiveChannel = bEnableEmissiveChannel;
-				Options.bUseDetailNormalTextureRGB =
+				Request.TextureSets = BuildGenerationTextureSets();
+				Request.Options.Preset = EMIForgeGenerationPreset::RGBMask;
+				Request.Options.TargetPath = CurrentTargetPath;
+				Request.Options.bUseBaseORMTexture = bUseBaseORMTexture;
+				Request.Options.bEnableEmissiveChannel = bEnableEmissiveChannel;
+				Request.Options.bUseDetailNormalTextureRGB =
 					bUseDetailNormalTextureRGB;
-				Options.IfMIExists = CurrentIfMIExistsOption;
+				Request.Options.IfMIExists = CurrentIfMIExistsOption;
 
-				const TArray<TSharedPtr<FMIForgeTextureSet>> GenerationSets = BuildGenerationTextureSets();
-				FMIForgeMaterialInstanceGenerator Generator;
-				FMIForgeGenerationResult Result;
+				const FMIForgeGenerationOutcome Outcome =
+					FMIForgeGenerationCoordinator()
+					.ExecuteMaterialGeneration(Request);
 
-				// Store target folder for navigation
-				FString TargetFolderPath = Options.TargetPath;
-
-				{
-					FScopedTransaction Transaction(LOCTEXT("GenerateMaterialInstances", "Generate Material Instances"));
-					Result = Generator.GenerateMaterialInstances(GenerationSets, Options);
-
-					if (Result.CreatedAssets.Num() > 0)
-					{
-						UMIForgeGenerationUndoRecord* UndoRecord =
-							NewObject<UMIForgeGenerationUndoRecord>(
-								GetTransientPackage(),
-								NAME_None,
-								RF_Transactional
-							);
-
-						for (UObject* CreatedAsset : Result.CreatedAssets)
-						{
-							if (IsValid(CreatedAsset))
-							{
-								UndoRecord->CreatedAssetPaths.AddUnique(FSoftObjectPath(CreatedAsset));
-							}
-						}
-
-						UndoRecord->Modify();
-						UndoRecord->bAssetsShouldExist = true;
-					}
-
-					if (Result.CreatedCount + Result.UpdatedCount == 0)
-					{
-						Transaction.Cancel();
-					}
-				}
-
-				// Log messages
-				for (const FText& Message : Result.Messages)
-				{
-					FString MessageString = Message.ToString();
-					MIForgeUtilities::PrintLog(MessageString, ELogVerbosity::Error);
-				}
-
-				// Navigate to target folder (100% safe - never crashes)
-				if (Result.CreatedCount > 0 || Result.UpdatedCount > 0)
-				{
-					// Defer folder navigation to next frame for stability
-					FTSTicker::GetCoreTicker().AddTicker(
-						FTickerDelegate::CreateLambda([TargetFolderPath](float) -> bool
-							{
-								FContentBrowserModule& ContentBrowserModule =
-									FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
-
-								TArray<FString> FoldersToSync;
-								FoldersToSync.Add(TargetFolderPath);
-
-								// Navigate to folder - this is 100% crash-proof
-								ContentBrowserModule.Get().SyncBrowserToFolders(FoldersToSync, false, false);
-
-								// Optional: Log success
-								UE_LOG(LogTemp, Log, TEXT("Navigated Content Browser to: %s"), *TargetFolderPath);
-
-								return false; // Single execution
-							}),
-						0.3f // Small delay for stability
-					);
-				}
-
-				MIForgeUtilities::PrintNotification(FText::FromString(
-					FString::Printf(TEXT("Material Instances Created: %d, Updated: %d, Skipped: %d, Failed: %d. "),
-						Result.CreatedCount, Result.UpdatedCount, Result.SkippedCount, Result.FailedCount)).ToString(), 5.f);
+				MIForgeUtilities::PrintNotification(
+					Outcome.SummaryText.ToString(),
+					5.f);
 
 				return FReply::Handled();
 					})
@@ -2698,10 +2560,11 @@ void SMainTabWidget::GenerateVertexPaintMIButton(TSharedRef<SVerticalBox> Contai
 					return FReply::Handled();
 				}
 
-				FMIForgeVertexPaintGenerationOptions Options;
-
-				Options.TargetPath = CurrentTargetPath;
-				Options.IfMIExists = this->CurrentIfMIExistsOption;
+				FMIForgeVertexPaintGenerationRequest Request;
+				Request.LayerStack = VertexPaintLayerStack;
+				Request.Options.TargetPath = CurrentTargetPath;
+				Request.Options.IfMIExists = CurrentIfMIExistsOption;
+				
 
 				const FString RequestedMIName =
 					CurrentVertexPaintMIName.TrimStartAndEnd();
@@ -2722,75 +2585,17 @@ void SMainTabWidget::GenerateVertexPaintMIButton(TSharedRef<SVerticalBox> Contai
 						return FReply::Handled();
 					}
 
-					Options.MaterialInstanceName = RequestedMIName;
+					Request.Options.MaterialInstanceName = RequestedMIName;
 				}
 
-				FMIForgeMaterialInstanceGenerator Generator;
-				FMIForgeGenerationResult Result;
+				const FMIForgeGenerationOutcome Outcome =
+					FMIForgeGenerationCoordinator()
+					.ExecuteVertexPaintGeneration(Request);
 
-				//undo feature related
-				FString TargetFolderPath = Options.TargetPath;
-
-				{
-					FScopedTransaction Transaction(LOCTEXT("GenerateVertexPaintMI", "Generate Vertex Paint Material Instances"));
-					Result = Generator.GenerateVertexPaintMaterialInstance(VertexPaintLayerStack, Options);
-
-					if (Result.CreatedAssets.Num() > 0)
-					{
-						UMIForgeGenerationUndoRecord* UndoRecord =
-							NewObject<UMIForgeGenerationUndoRecord>(
-								GetTransientPackage(),
-								NAME_None,
-								RF_Transactional
-							);
-
-						if (IsValid(Result.CreatedAssets[0]))
-						{
-							UndoRecord->CreatedAssetPaths.AddUnique(FSoftObjectPath(Result.CreatedAssets[0]));
-						}
-						UndoRecord->Modify();
-						UndoRecord->bAssetsShouldExist = true;
-
-					}
-					if (Result.CreatedCount + Result.UpdatedCount == 0)
-					{
-						Transaction.Cancel();
-					}
-
-				}
-
-				for(const FText& Message : Result.Messages)
-				{
-					FString MessageString = Message.ToString();
-					MIForgeUtilities::PrintLog(MessageString, ELogVerbosity::Error);
-				}
-
-				if (Result.CreatedCount > 0 || Result.UpdatedCount > 0)
-				{
-					FTSTicker::GetCoreTicker().AddTicker(
-						FTickerDelegate::CreateLambda([TargetFolderPath](float) ->bool
-							{
-								FContentBrowserModule& ContentBrowserModule =
-									FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
-								TArray<FString> FoldersToSync;
-								FoldersToSync.Add(TargetFolderPath);
-
-								ContentBrowserModule.Get().SyncBrowserToFolders(FoldersToSync, false, false);
-
-								// Optional: Log success
-								UE_LOG(LogTemp, Log, TEXT("Navigated Content Browser to: %s"), *TargetFolderPath);
-								return false; // Single execution
-
-							}
-						
-						),
-						0.3f // Small delay for stability
-					);
-				}
-
-				MIForgeUtilities::PrintNotification(FText::FromString(
-					FString::Printf(TEXT("Material Instances Created: %d, Updated: %d, Skipped: %d, Failed: %d. "),
-						Result.CreatedCount, Result.UpdatedCount, Result.SkippedCount, Result.FailedCount)).ToString(), 5.f);
+				MIForgeUtilities::PrintNotification(
+					Outcome.SummaryText.ToString(),
+					5.f);
+				
 
 				return FReply::Handled();
 					})
@@ -4073,8 +3878,6 @@ TArray<TSharedPtr<FMIForgeTextureSet>> SMainTabWidget::BuildGenerationTextureSet
 
 	return Result;
 }
-
-
 
 
 #undef LOCTEXT_NAMESPACE

@@ -8,10 +8,11 @@
 #include "ContentBrowserModule.h"
 #include "IContentBrowserSingleton.h"
 #include "MIForgeMaterialInstanceGenerator.h"
+#include "Containers/Ticker.h"
 
 #define LOCTEXT_NAMESPACE "MIForgeGenerationCoordinator"
 
-FMIForgeGenerationOutcome MIForgeGenerationCoordinator::ExecuteMaterialGeneration(const FMIForgeMaterialGenerationRequest& Request) const
+FMIForgeGenerationOutcome FMIForgeGenerationCoordinator::ExecuteMaterialGeneration(const FMIForgeMaterialGenerationRequest& Request) const
 {
 	FMIForgeMaterialInstanceGenerator Generator;
 
@@ -27,7 +28,7 @@ FMIForgeGenerationOutcome MIForgeGenerationCoordinator::ExecuteMaterialGeneratio
 	);
 }
 
-FMIForgeGenerationOutcome MIForgeGenerationCoordinator::ExecuteVertexPaintGeneration(const FMIForgeVertexPaintGenerationRequest& Request) const
+FMIForgeGenerationOutcome FMIForgeGenerationCoordinator::ExecuteVertexPaintGeneration(const FMIForgeVertexPaintGenerationRequest& Request) const
 {
 	FMIForgeMaterialInstanceGenerator Generator;
 
@@ -43,7 +44,7 @@ FMIForgeGenerationOutcome MIForgeGenerationCoordinator::ExecuteVertexPaintGenera
 	);
 }
 
-FMIForgeGenerationOutcome MIForgeGenerationCoordinator::ExecuteGeneration(const FString& TargetPath, const FText& TransactionText, TFunction<FMIForgeGenerationResult()> Generate) const
+FMIForgeGenerationOutcome FMIForgeGenerationCoordinator::ExecuteGeneration(const FString& TargetPath, const FText& TransactionText, TFunctionRef<FMIForgeGenerationResult()> Generate) const
 {
 	FMIForgeGenerationOutcome Outcome;
 
@@ -72,7 +73,7 @@ FMIForgeGenerationOutcome MIForgeGenerationCoordinator::ExecuteGeneration(const 
 	return Outcome;
 }
 
-void MIForgeGenerationCoordinator::RecordCreatedAssetsForUndo(const TArray<UObject*>& CreatedAssets) const
+void FMIForgeGenerationCoordinator::RecordCreatedAssetsForUndo(const TArray<UObject*>& CreatedAssets) const
 {
 	TArray<FSoftObjectPath> ValidCreatedPaths;
 
@@ -100,7 +101,7 @@ void MIForgeGenerationCoordinator::RecordCreatedAssetsForUndo(const TArray<UObje
 
 }
 
-void MIForgeGenerationCoordinator::LogMessages(const FMIForgeGenerationResult& Result) const
+void FMIForgeGenerationCoordinator::LogMessages(const FMIForgeGenerationResult& Result) const
 {
 	for (const FText& Message : Result.Messages)
 	{
@@ -109,7 +110,7 @@ void MIForgeGenerationCoordinator::LogMessages(const FMIForgeGenerationResult& R
 	}
 }
 
-void MIForgeGenerationCoordinator::QueueContentBrowserNavigation(const FString& TargetPath) const
+void FMIForgeGenerationCoordinator::QueueContentBrowserNavigation(const FString& TargetPath) const
 {
 	
 	// Defer folder navigation to next frame for stability
@@ -135,7 +136,7 @@ void MIForgeGenerationCoordinator::QueueContentBrowserNavigation(const FString& 
 	
 }
 
-FText MIForgeGenerationCoordinator::BuildSummaryText(const FMIForgeGenerationResult& Result) const
+FText FMIForgeGenerationCoordinator::BuildSummaryText(const FMIForgeGenerationResult& Result) const
 {
 	return FText::FromString(FString::Printf(TEXT("Material Instances Created: %d, Updated: %d, Skipped: %d, Failed: %d."),
 		Result.CreatedCount, Result.UpdatedCount, Result.SkippedCount, Result.FailedCount));

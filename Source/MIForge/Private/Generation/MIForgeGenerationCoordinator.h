@@ -28,7 +28,7 @@ struct FMIForgeGenerationOutcome
 	}
 };
 
-class MIForgeGenerationCoordinator
+class FMIForgeGenerationCoordinator
 {
 public:
 	FMIForgeGenerationOutcome ExecuteMaterialGeneration(const FMIForgeMaterialGenerationRequest& Request) const;
@@ -37,7 +37,7 @@ private:
 	FMIForgeGenerationOutcome ExecuteGeneration(
 		const FString& TargetPath,
 		const FText& TransactionText,
-		TFunction<FMIForgeGenerationResult()> Generate
+		TFunctionRef<FMIForgeGenerationResult()> Generate
 	) const;
 
 	void RecordCreatedAssetsForUndo(
