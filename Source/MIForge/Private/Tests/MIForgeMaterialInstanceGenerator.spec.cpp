@@ -202,10 +202,6 @@ void FMIForgeMaterialInstanceGeneratorSpec::Define()
 
 		It("should create and then skip an existing Standard material instance", [this]()
 		{
-			AddExpectedError(
-				TEXT("LoadAsset failed: The AssetData"),
-				EAutomationExpectedErrorFlags::Contains,
-				1);
 
 			FGeneratorTestContext Context;
 			const TSharedPtr<FMIForgeTextureSet> TextureSet =
@@ -244,10 +240,6 @@ void FMIForgeMaterialInstanceGeneratorSpec::Define()
 
 		It("should overwrite an existing Standard material instance", [this]()
 		{
-			AddExpectedError(
-				TEXT("LoadAsset failed: The AssetData"),
-				EAutomationExpectedErrorFlags::Contains,
-				1);
 
 			FGeneratorTestContext Context;
 			const TSharedPtr<FMIForgeTextureSet> TextureSet =
@@ -287,10 +279,6 @@ void FMIForgeMaterialInstanceGeneratorSpec::Define()
 
 		It("should create a uniquely named Standard material instance", [this]()
 		{
-			AddExpectedError(
-				TEXT("LoadAsset failed: The AssetData"),
-				EAutomationExpectedErrorFlags::Contains,
-				1);
 
 			FGeneratorTestContext Context;
 			const TSharedPtr<FMIForgeTextureSet> TextureSet =
@@ -341,11 +329,6 @@ void FMIForgeMaterialInstanceGeneratorSpec::Define()
 
 		It("should generate RGB Mask with Emissive Channel enabled and no Emissive texture", [this]()
 		{
-			AddExpectedError(
-				TEXT("LoadAsset failed: The AssetData"),
-				EAutomationExpectedErrorFlags::Contains,
-				1);
-
 			FGeneratorTestContext Context;
 			const TSharedPtr<FMIForgeTextureSet> TextureSet =
 				Context.MakeTextureSet(
@@ -383,11 +366,6 @@ void FMIForgeMaterialInstanceGeneratorSpec::Define()
 	{
 		It("should use the default and custom Vertex Paint material instance names", [this]()
 		{
-			AddExpectedError(
-				TEXT("LoadAsset failed: The AssetData"),
-				EAutomationExpectedErrorFlags::Contains,
-				2);
-
 			FGeneratorTestContext Context;
 			const FMIForgeVertexPaintLayerStack Stack =
 				MakeVertexPaintLayerStack(Context);

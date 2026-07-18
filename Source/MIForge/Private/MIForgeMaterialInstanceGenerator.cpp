@@ -13,6 +13,11 @@
 #include "ObjectTools.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Presets/MIForgePresetDefinitions.h"
+#include "Generation/MIForgeMaterialInstanceResolver.h"
+
+#include "Generation/MIForgeStandardParameterApplier.h"
+#include "Generation/MIForgeRGBMaskParameterApplier.h"
+#include "Generation/MIForgeVPParameterApplier.h"
 
 FMIForgeGenerationResult FMIForgeMaterialInstanceGenerator::GenerateMaterialInstances(const TArray<TSharedPtr<FMIForgeTextureSet>>& TextureSets, const FMIForgeGenerationOptions& Options) const
 {
@@ -65,8 +70,18 @@ FMIForgeGenerationResult FMIForgeMaterialInstanceGenerator::GenerateMaterialInst
 			continue;
 		}
 
-		FMIForgeMaterialInstanceResolution Resolution =
-			ResolveMaterialInstance(*TextureSet, ParentMaterial, Options, AssetTools);
+		FMIForgeMaterialInstanceTarget Target;
+		Target.AssetName = FString::Printf(
+			TEXT("MI_%s"),
+			*TextureSet->SetName);
+		Target.TargetPath = Options.TargetPath;
+		Target.IfMIExists = Options.IfMIExists;
+		Target.ParentMaterial = ParentMaterial;
+
+		const FMIForgeMaterialInstanceResolution Resolution =
+			FMIForgeMaterialInstanceResolver().Resolve(
+				Target,
+				AssetTools);
 
 		switch (Resolution.Action)
 		{
@@ -118,11 +133,13 @@ FMIForgeGenerationResult FMIForgeMaterialInstanceGenerator::GenerateMaterialInst
 		const bool bWasCreated =
 			Resolution.Action == EMIForgeGenerationAction::Created;
 
+		FText ApplyError;
 		
 		if(ApplyTexturesToMaterialInstance(
 			Resolution.MaterialInstance,
 			*TextureSet,
-			Options
+			Options,
+			ApplyError
 		))
 		{
 			MIForgeUtilities::PrintLog(
@@ -179,11 +196,19 @@ FMIForgeGenerationResult FMIForgeMaterialInstanceGenerator::GenerateMaterialInst
 				
 			}
 
-
 			Result.FailedCount++;
-			Result.Messages.Add(FText::FromString(
-				FString::Printf(TEXT("Failed to apply textures to MI: %s"), *TextureSet->SetName)
-			));
+			if (!ApplyError.IsEmpty())
+			{
+				Result.Messages.Add(ApplyError);
+			}
+			else
+			{
+				Result.Messages.Add(
+					FText::FromString(
+						FString::Printf(
+							TEXT("Failed to apply textures to MI: %s"),
+							*TextureSet->SetName)));
+			}
 			continue;
 		}
 
@@ -202,450 +227,29 @@ FMIForgeGenerationResult FMIForgeMaterialInstanceGenerator::GenerateMaterialInst
 	return Result;
 }
 
-FMIForgeMaterialInstanceResolution FMIForgeMaterialInstanceGenerator::ResolveMaterialInstance(const FMIForgeTextureSet& TextureSet, UMaterialInterface* ParentMaterial, const FMIForgeGenerationOptions& Options, IAssetTools& AssetTools) const
-{
-	UMaterialInstanceConstantFactoryNew* Factory = NewObject<UMaterialInstanceConstantFactoryNew>();
-
-	Factory->InitialParent = ParentMaterial;
-
-	const FString AssetName = FString::Printf(TEXT("MI_%s"), *TextureSet.SetName);
-
-	const FString BasePackageName = FString::Printf(
-		TEXT("%s/%s"),
-		*Options.TargetPath,
-		*AssetName
-	);
-
-	const FString ObjectPath = FString::Printf(
-		TEXT("%s.%s"),
-		*BasePackageName,
-		*AssetName
-	);
-
-	// Check multiple sources and validate object state
-	bool bAssetAlreadyExists = false;
-	UMaterialInstanceConstant* ExistingValidMIC = nullptr;
-
-	// Step 1: Try to load the asset
-	UObject* ExistingAsset = UEditorAssetLibrary::LoadAsset(ObjectPath);
-	
-	if (ExistingAsset && IsValid(ExistingAsset) && !ExistingAsset->IsUnreachable())
-	{
-		ExistingValidMIC = Cast<UMaterialInstanceConstant>(ExistingAsset);
-		if (ExistingValidMIC && IsValid(ExistingValidMIC))
-		{
-			bAssetAlreadyExists = true;
-		}
-	}
-
-	// Step 2: If not loaded, check registry and disk
-	if (!bAssetAlreadyExists)
-	{
-		// Check asset registry
-		if (UEditorAssetLibrary::DoesAssetExist(ObjectPath))
-		{
-			// Verify file exists on disk
-			FString PackageFilename;
-			if (FPackageName::TryConvertLongPackageNameToFilename(
-				BasePackageName, 
-				PackageFilename, 
-				FPackageName::GetAssetPackageExtension()))
-			{
-				if (FPlatformFileManager::Get().GetPlatformFile().FileExists(*PackageFilename))
-				{
-					// File exists but object might be invalid - try loading again
-					ExistingAsset = UEditorAssetLibrary::LoadAsset(ObjectPath);
-					if (ExistingAsset && IsValid(ExistingAsset) && !ExistingAsset->IsUnreachable())
-					{
-						ExistingValidMIC = Cast<UMaterialInstanceConstant>(ExistingAsset);
-						if (ExistingValidMIC && IsValid(ExistingValidMIC))
-						{
-							bAssetAlreadyExists = true;
-						}
-					}
-				}
-			}
-		}
-	}
-
-	FMIForgeMaterialInstanceResolution Resolution;
-
-	FString FinalAssetName = AssetName;
-	FString FinalPackagePath = Options.TargetPath;
-
-	if (bAssetAlreadyExists && ExistingValidMIC)
-	{
-		switch (Options.IfMIExists)
-		{
-		case EIfMIExistsOption::Skip:
-			Resolution.Action = EMIForgeGenerationAction::Skipped;
-			Resolution.Message = FText::FromString(
-				FString::Printf(TEXT("Skipped existing MI: %s"), *ObjectPath)
-			);
-			return Resolution;
-
-		case EIfMIExistsOption::Overwrite:
-		{
-			// Validate object is safe to modify
-			if (!IsValid(ExistingValidMIC) || ExistingValidMIC->IsUnreachable())
-			{
-				Resolution.Action = EMIForgeGenerationAction::Failed;
-				Resolution.Message = FText::FromString(
-					FString::Printf(TEXT("Existing MI is invalid or pending deletion: %s"), *ObjectPath)
-				);
-				return Resolution;
-			}
-
-			Resolution.MaterialInstance = ExistingValidMIC;
-			Resolution.Action = EMIForgeGenerationAction::Updated;
-			return Resolution;
-		}
-
-		case EIfMIExistsOption::CreateUnique:
-		{
-			FString UniquePackageName;
-			FString UniqueAssetName;
-
-			AssetTools.CreateUniqueAssetName(
-				BasePackageName,
-				TEXT("_01"),
-				UniquePackageName,
-				UniqueAssetName
-			);
-
-			FinalAssetName = UniqueAssetName;
-			FinalPackagePath = FPackageName::GetLongPackagePath(UniquePackageName);
-			break;
-		}
-		}
-	}
-
-	// Create new asset
-	UMaterialInstanceConstant* NewMIC =
-		Cast<UMaterialInstanceConstant>(
-			AssetTools.CreateAsset(
-				FinalAssetName,
-				FinalPackagePath,
-				UMaterialInstanceConstant::StaticClass(),
-				Factory
-			)
-		);
-
-	if (!NewMIC)
-	{
-		Resolution.Action = EMIForgeGenerationAction::Failed;
-		Resolution.Message = FText::FromString(
-			FString::Printf(TEXT("Failed to create MI for: %s"), *TextureSet.SetName)
-		);
-		return Resolution;
-	}
-
-	Resolution.MaterialInstance = NewMIC;
-	Resolution.Action = EMIForgeGenerationAction::Created;
-	return Resolution;
-}
-
-bool FMIForgeMaterialInstanceGenerator::ApplyTexturesToMaterialInstance(UMaterialInstanceConstant* MaterialInstanceConstant, const FMIForgeTextureSet& TextureSet, const FMIForgeGenerationOptions& Options) const
+bool FMIForgeMaterialInstanceGenerator::ApplyTexturesToMaterialInstance(UMaterialInstanceConstant* MaterialInstance, const FMIForgeTextureSet& TextureSet, const FMIForgeGenerationOptions& Options, FText& OutError) const
 {
 	switch(Options.Preset)
 	{
 		case EMIForgeGenerationPreset::Standard:
-			return ApplyTexturesToStandardMaterialInstance(MaterialInstanceConstant, TextureSet, Options);
+			return FMIForgeStandardParameterApplier().Apply(
+				MaterialInstance,
+				TextureSet,
+				Options,
+				OutError);
+
 		case EMIForgeGenerationPreset::RGBMask:
-			return ApplyTexturesToRGBMaterialInstance(MaterialInstanceConstant, TextureSet, Options);
-	}
-	return false;
-}
+			return FMIForgeRGBMaskParameterApplier().Apply(
+				MaterialInstance,
+				TextureSet,
+				Options,
+				OutError);
 
-bool FMIForgeMaterialInstanceGenerator::ApplyTexturesToStandardMaterialInstance(UMaterialInstanceConstant* MaterialInstanceConstant, const FMIForgeTextureSet& TextureSet, const FMIForgeGenerationOptions& Options) const
-{
-	const FMIForgeMaterialPresetDefinition& Definition =
-		FMIForgePresetDefinitions::GetStandard();
-
-	auto ApplyRequiredTexture =
-		[MaterialInstanceConstant, &TextureSet, &Definition](
-			EMIForgeTextureType TextureType,
-			const TCHAR* DisplayName) -> bool
-		{
-			const FMIForgeTextureBinding* Binding =
-				Definition.FindTextureBinding(TextureType);
-
-			if (!Binding || Binding->ParameterName.IsNone())
-			{
-				MIForgeUtilities::PrintLog(
-					FString::Printf(
-						TEXT("No material parameter mapping configured for %s."),
-						DisplayName),
-					ELogVerbosity::Error);
-				return false;
-			}
-
-			const FMIForgeTextureInfo* TextureInfo =
-				TextureSet.Textures.Find(TextureType);
-			UTexture* Texture = TextureInfo && TextureInfo->AssetData.IsValid()
-				? Cast<UTexture>(TextureInfo->AssetData.GetAsset())
-				: nullptr;
-
-			if (!Texture)
-			{
-				MIForgeUtilities::PrintLog(
-					FString::Printf(
-						TEXT("%s texture not found or invalid for set: %s"),
-						DisplayName,
-						*TextureSet.SetName),
-					ELogVerbosity::Error);
-				return false;
-			}
-
-			UMaterialEditingLibrary::SetMaterialInstanceTextureParameterValue(
-				MaterialInstanceConstant,
-				Binding->ParameterName,
-				Texture);
-			return true;
-		};
-
-	if (!ApplyRequiredTexture(EMIForgeTextureType::Albedo, TEXT("Albedo")) ||
-		!ApplyRequiredTexture(EMIForgeTextureType::Normal, TEXT("Normal")) ||
-		!ApplyRequiredTexture(EMIForgeTextureType::ORM, TEXT("ORM")))
-	{
-		return false;
-	}
-
-	auto ApplyOptionalTexture =
-		[MaterialInstanceConstant, &TextureSet, &Definition](
-			EMIForgeTextureType TextureType,
-			const TCHAR* DisplayName,
-			bool bRequested,
-			bool& bApplied) -> bool
-		{
-			bApplied = false;
-			if (!bRequested)
-			{
-				return true;
-			}
-
-			const FMIForgeTextureBinding* Binding =
-				Definition.FindTextureBinding(TextureType);
-			if (!Binding || Binding->ParameterName.IsNone())
-			{
-				MIForgeUtilities::PrintLog(
-					FString::Printf(
-						TEXT("No material parameter mapping configured for %s."),
-						DisplayName),
-					ELogVerbosity::Error);
-				return false;
-			}
-
-			const FMIForgeTextureInfo* TextureInfo =
-				TextureSet.Textures.Find(TextureType);
-			UTexture* Texture = TextureInfo && TextureInfo->AssetData.IsValid()
-				? Cast<UTexture>(TextureInfo->AssetData.GetAsset())
-				: nullptr;
-
-			if (!Texture)
-			{
-				MIForgeUtilities::PrintLog(
-					FString::Printf(
-						TEXT("%s texture not found or invalid for set: %s, Generated without %s"),
-						DisplayName,
-						*TextureSet.SetName,
-						DisplayName),
-					ELogVerbosity::Warning);
-				return true;
-			}
-
-			UMaterialEditingLibrary::SetMaterialInstanceTextureParameterValue(
-				MaterialInstanceConstant,
-				Binding->ParameterName,
-				Texture);
-			bApplied = true;
-			return true;
-		};
-
-	bool bEmissiveApplied = false;
-	bool bDetailNormalApplied = false;
-	if (!ApplyOptionalTexture(
-			EMIForgeTextureType::Emissive,
-			TEXT("Emissive"),
-			Options.bUseEmissive,
-			bEmissiveApplied) ||
-		!ApplyOptionalTexture(
-			EMIForgeTextureType::DetailNormal,
-			TEXT("Detail Normal"),
-			Options.bUseDetailNormal,
-			bDetailNormalApplied))
-	{
-		return false;
-	}
-
-	const FMIForgeStaticSwitchBinding* EmissiveSwitch =
-		Definition.FindStaticSwitchBinding(
-			EMIForgePresetOptions::UseEmissiveTexture);
-	const FMIForgeStaticSwitchBinding* DetailNormalSwitch =
-		Definition.FindStaticSwitchBinding(
-			EMIForgePresetOptions::UseDetailNormalTexture);
-	const FMIForgeStaticSwitchBinding* TriplanarSwitch =
-		Definition.FindStaticSwitchBinding(
-			EMIForgePresetOptions::UseTriplanar);
-
-	if (!EmissiveSwitch || EmissiveSwitch->ParameterName.IsNone() ||
-		!DetailNormalSwitch || DetailNormalSwitch->ParameterName.IsNone() ||
-		!TriplanarSwitch || TriplanarSwitch->ParameterName.IsNone())
-	{
-		MIForgeUtilities::PrintLog(
-			TEXT("Standard preset has an invalid static switch mapping."),
-			ELogVerbosity::Error);
-		return false;
-	}
-
-	UMaterialEditingLibrary::SetMaterialInstanceStaticSwitchParameterValue(
-		MaterialInstanceConstant,
-		EmissiveSwitch->ParameterName,
-		bEmissiveApplied);
-	UMaterialEditingLibrary::SetMaterialInstanceStaticSwitchParameterValue(
-		MaterialInstanceConstant,
-		DetailNormalSwitch->ParameterName,
-		bDetailNormalApplied);
-	UMaterialEditingLibrary::SetMaterialInstanceStaticSwitchParameterValue(
-		MaterialInstanceConstant,
-		TriplanarSwitch->ParameterName,
-		Options.bUseTriplanar);
-
-	return true;
-}
-
-bool FMIForgeMaterialInstanceGenerator::ApplyTexturesToRGBMaterialInstance(UMaterialInstanceConstant* MaterialInstanceConstant, const FMIForgeTextureSet& TextureSet, const FMIForgeGenerationOptions& Options) const
-{
-	const FMIForgeMaterialPresetDefinition& Definition =
-		FMIForgePresetDefinitions::GetRGBMask();
-
-	auto ApplyRequiredTexture =
-		[MaterialInstanceConstant, &TextureSet, &Definition](
-			EMIForgeTextureType TextureType,
-			const TCHAR* DisplayName) -> bool
-		{
-			const FMIForgeTextureBinding* Binding =
-				Definition.FindTextureBinding(TextureType);
-			if (!Binding || Binding->ParameterName.IsNone())
-			{
-				MIForgeUtilities::PrintLog(
-					FString::Printf(
-						TEXT("No material parameter mapping configured for %s."),
-						DisplayName),
-					ELogVerbosity::Error);
-				return false;
-			}
-
-			const FMIForgeTextureInfo* TextureInfo =
-				TextureSet.Textures.Find(TextureType);
-			UTexture* Texture = TextureInfo && TextureInfo->AssetData.IsValid()
-				? Cast<UTexture>(TextureInfo->AssetData.GetAsset())
-				: nullptr;
-			if (!Texture)
-			{
-				MIForgeUtilities::PrintLog(
-					FString::Printf(
-						TEXT("%s texture not found or invalid for set: %s"),
-						DisplayName,
-						*TextureSet.SetName),
-					ELogVerbosity::Error);
-				return false;
-			}
-
-			UMaterialEditingLibrary::SetMaterialInstanceTextureParameterValue(
-				MaterialInstanceConstant,
-				Binding->ParameterName,
-				Texture);
-			return true;
-		};
-
-	if (!ApplyRequiredTexture(EMIForgeTextureType::Albedo, TEXT("Albedo")) ||
-		!ApplyRequiredTexture(EMIForgeTextureType::Normal, TEXT("Normal")) ||
-		!ApplyRequiredTexture(EMIForgeTextureType::RGB, TEXT("RGB")))
-	{
-		return false;
-	}
-
-	bool bBaseORMApplied = false;
-	if (Options.bUseBaseORMTexture)
-	{
-		if (!ApplyRequiredTexture(EMIForgeTextureType::ORM, TEXT("ORM")))
-		{
+		default:
+			OutError =
+				FText::FromString(TEXT("Unsupported generation preset."));
 			return false;
-		}
-		bBaseORMApplied = true;
 	}
-
-	bool bDetailNormalApplied = false;
-	if (Options.bUseDetailNormalTextureRGB)
-	{
-		const FMIForgeTextureBinding* Binding =
-			Definition.FindTextureBinding(EMIForgeTextureType::DetailNormal);
-		if (!Binding || Binding->ParameterName.IsNone())
-		{
-			MIForgeUtilities::PrintLog(
-				TEXT("No material parameter mapping configured for Detail Normal."),
-				ELogVerbosity::Error);
-			return false;
-		}
-
-		const FMIForgeTextureInfo* DetailNormal =
-			TextureSet.Textures.Find(EMIForgeTextureType::DetailNormal);
-		UTexture* Texture = DetailNormal && DetailNormal->AssetData.IsValid()
-			? Cast<UTexture>(DetailNormal->AssetData.GetAsset())
-			: nullptr;
-
-		if (!Texture)
-		{
-			MIForgeUtilities::PrintLog(
-				FString::Printf(
-					TEXT("Detail Normal texture not found or invalid for set: %s, Generated without Detail Normal"),
-					*TextureSet.SetName),
-				ELogVerbosity::Warning);
-		}
-		else
-		{
-			UMaterialEditingLibrary::SetMaterialInstanceTextureParameterValue(
-				MaterialInstanceConstant,
-				Binding->ParameterName,
-				Texture);
-			bDetailNormalApplied = true;
-		}
-	}
-
-	const FMIForgeStaticSwitchBinding* BaseORMSwitch =
-		Definition.FindStaticSwitchBinding(EMIForgePresetOptions::UseBaseORM);
-	const FMIForgeStaticSwitchBinding* EmissiveChannelSwitch =
-		Definition.FindStaticSwitchBinding(
-			EMIForgePresetOptions::EnableEmissiveChannel);
-	const FMIForgeStaticSwitchBinding* DetailNormalSwitch =
-		Definition.FindStaticSwitchBinding(
-			EMIForgePresetOptions::UseDetailNormalTexture);
-
-	if (!BaseORMSwitch || BaseORMSwitch->ParameterName.IsNone() ||
-		!EmissiveChannelSwitch || EmissiveChannelSwitch->ParameterName.IsNone() ||
-		!DetailNormalSwitch || DetailNormalSwitch->ParameterName.IsNone())
-	{
-		MIForgeUtilities::PrintLog(
-			TEXT("RGB Mask preset has an invalid static switch mapping."),
-			ELogVerbosity::Error);
-		return false;
-	}
-
-	UMaterialEditingLibrary::SetMaterialInstanceStaticSwitchParameterValue(
-		MaterialInstanceConstant,
-		BaseORMSwitch->ParameterName,
-		bBaseORMApplied);
-	UMaterialEditingLibrary::SetMaterialInstanceStaticSwitchParameterValue(
-		MaterialInstanceConstant,
-		EmissiveChannelSwitch->ParameterName,
-		Options.bEnableEmissiveChannel);
-	UMaterialEditingLibrary::SetMaterialInstanceStaticSwitchParameterValue(
-		MaterialInstanceConstant,
-		DetailNormalSwitch->ParameterName,
-		bDetailNormalApplied);
-
-	return true;
 }
 
 bool FMIForgeMaterialInstanceGenerator::ValidateGenerationInputs(const FMIForgeTextureSet& TextureSet, UMaterialInterface* ParentMaterial, const FMIForgeGenerationOptions& Options, FText& OutError) const
@@ -1078,18 +682,32 @@ FMIForgeGenerationResult FMIForgeMaterialInstanceGenerator::GenerateVertexPaintM
 	FAssetToolsModule& AssetToolsModule = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools");
 	IAssetTools& AssetTools = AssetToolsModule.Get();
 
-	FMIForgeMaterialInstanceResolution Resolution;
-	if (Options.MaterialInstanceName.IsEmpty())
-	{
-		Resolution =
-			ResolveMaterialInstanceByName(LayerStack.BaseLayer.AssignedTextureSet->SetName, ParentMaterial, Options.TargetPath, Options.IfMIExists, AssetTools);
-	}
-	else
-	{
-		 Resolution =
-			ResolveMaterialInstanceByName(Options.MaterialInstanceName, ParentMaterial, Options.TargetPath, Options.IfMIExists, AssetTools);
-	}
 
+	FMIForgeMaterialInstanceTarget Target;
+
+	const FString RequestedName =
+		Options.MaterialInstanceName.IsEmpty()
+		? LayerStack.BaseLayer.AssignedTextureSet->SetName
+		: Options.MaterialInstanceName;
+
+	const FString FinalAssetName =
+		RequestedName.StartsWith(TEXT("MI_VP_")) ||
+		RequestedName.StartsWith(TEXT("MI_"))
+		? RequestedName
+		: FString::Printf(
+			TEXT("MI_VP_%s"),
+			*RequestedName);
+	
+	Target.AssetName = FinalAssetName;
+	Target.TargetPath = Options.TargetPath;
+	Target.IfMIExists = Options.IfMIExists;
+	Target.ParentMaterial = ParentMaterial;
+
+	const FMIForgeMaterialInstanceResolution Resolution =
+			FMIForgeMaterialInstanceResolver().Resolve(
+				Target,
+				AssetTools);
+	
 	switch (Resolution.Action)
 	{
 	case EMIForgeGenerationAction::Skipped:
@@ -1136,47 +754,14 @@ FMIForgeGenerationResult FMIForgeMaterialInstanceGenerator::GenerateVertexPaintM
 	const bool bWasCreated =
 		Resolution.Action == EMIForgeGenerationAction::Created;
 
-	const bool bLayerGEnabled =
-		LayerStack.LayerG.AssignedTextureSet.IsValid();
+	FText ApplyError;
 
-	const bool bLayerBEnabled =
-		LayerStack.LayerB.AssignedTextureSet.IsValid();
-
-	FText OutError;
-
-	if (!ApplyVertexPaintLayerTextures(
+	if (!FMIForgeVPParameterApplier().Apply(
 		Resolution.MaterialInstance,
-		LayerStack.BaseLayer,
-		bLayerGEnabled,
-		bLayerBEnabled,
-		OutError
-	))
+		LayerStack,
+		ApplyError))
 	{
-		if (bWasCreated && Resolution.MaterialInstance && IsValid(Resolution.MaterialInstance))
-		{	
-			TArray<UObject*> ObjectsToDelete;
-			ObjectsToDelete.Add(Resolution.MaterialInstance);
-
-			ObjectTools::DeleteObjectsUnchecked(ObjectsToDelete);
-
-			Result.CreatedAssets.Remove(Resolution.MaterialInstance);
-		}
-		Result.Messages.Add(OutError);
-		Result.FailedCount++;
-		Result.Messages.Add(FText::FromString(
-			FString::Printf(TEXT("Failed to apply textures to Layer: %s"), *LayerStack.BaseLayer.DisplayName)
-		));
-		return Result;
-	}
-
-	if (!ApplyVertexPaintLayerTextures(
-		Resolution.MaterialInstance,
-		LayerStack.LayerR,
-		bLayerGEnabled,
-		bLayerBEnabled,
-		OutError
-	))
-	{
+		// Keep existing newly-created-asset cleanup here.
 		if (bWasCreated && Resolution.MaterialInstance && IsValid(Resolution.MaterialInstance))
 		{
 			TArray<UObject*> ObjectsToDelete;
@@ -1186,63 +771,16 @@ FMIForgeGenerationResult FMIForgeMaterialInstanceGenerator::GenerateVertexPaintM
 
 			Result.CreatedAssets.Remove(Resolution.MaterialInstance);
 		}
-		Result.Messages.Add(OutError);
-		Result.FailedCount++;
-		Result.Messages.Add(FText::FromString(
-			FString::Printf(TEXT("Failed to apply textures to Layer: %s"), *LayerStack.LayerR.DisplayName)
-		));
-		return Result;
-	}
 
-	if (!ApplyVertexPaintLayerTextures(
-		Resolution.MaterialInstance,
-		LayerStack.LayerG,
-		bLayerGEnabled,
-		bLayerBEnabled,
-		OutError
-	))
-	{
-		if (bWasCreated && Resolution.MaterialInstance && IsValid(Resolution.MaterialInstance))
+		if (!ApplyError.IsEmpty())
 		{
-			TArray<UObject*> ObjectsToDelete;
-			ObjectsToDelete.Add(Resolution.MaterialInstance);
-
-			ObjectTools::DeleteObjectsUnchecked(ObjectsToDelete);
-
-			Result.CreatedAssets.Remove(Resolution.MaterialInstance);
+			Result.Messages.Add(ApplyError);
 		}
-		Result.Messages.Add(OutError);
+
 		Result.FailedCount++;
-		Result.Messages.Add(FText::FromString(
-			FString::Printf(TEXT("Failed to apply textures to Layer: %s"), *LayerStack.LayerG.DisplayName)
-		));
 		return Result;
 	}
 
-	if (!ApplyVertexPaintLayerTextures(
-		Resolution.MaterialInstance,
-		LayerStack.LayerB,
-		bLayerGEnabled,
-		bLayerBEnabled,
-		OutError
-	))
-	{
-		if (bWasCreated && Resolution.MaterialInstance && IsValid(Resolution.MaterialInstance))
-		{
-			TArray<UObject*> ObjectsToDelete;
-			ObjectsToDelete.Add(Resolution.MaterialInstance);
-
-			ObjectTools::DeleteObjectsUnchecked(ObjectsToDelete);
-
-			Result.CreatedAssets.Remove(Resolution.MaterialInstance);
-		}
-		Result.Messages.Add(OutError);
-		Result.FailedCount++;
-		Result.Messages.Add(FText::FromString(
-			FString::Printf(TEXT("Failed to apply textures to Layer: %s"), *LayerStack.LayerB.DisplayName)
-		));
-		return Result;
-	}
 	if (Resolution.Action == EMIForgeGenerationAction::Created)
 	{	
 		Resolution.MaterialInstance->MarkPackageDirty();
@@ -1259,391 +797,3 @@ FMIForgeGenerationResult FMIForgeMaterialInstanceGenerator::GenerateVertexPaintM
 	return Result;
 
 }
-
-FMIForgeMaterialInstanceResolution FMIForgeMaterialInstanceGenerator::ResolveMaterialInstanceByName(const FString& AssetName, UMaterialInterface* ParentMaterial, const FString& TargetPath, EIfMIExistsOption IfMIExists, IAssetTools& AssetTools) const
-{
-	UMaterialInstanceConstantFactoryNew* Factory = NewObject<UMaterialInstanceConstantFactoryNew>();
-
-	Factory->InitialParent = ParentMaterial;
-
-	const FString FinalBaseAssetName =
-		AssetName.StartsWith(TEXT("MI_VP_")) || AssetName.StartsWith(TEXT("MI_"))
-		? AssetName
-		: FString::Printf(TEXT("MI_VP_%s"), *AssetName);
-
-	const FString BasePackageName = FString::Printf(
-		TEXT("%s/%s"),
-		*TargetPath,
-		*FinalBaseAssetName
-	);
-
-	const FString ObjectPath = FString::Printf(
-		TEXT("%s.%s"),
-		*BasePackageName,
-		*FinalBaseAssetName
-	);
-
-	bool bAssetAlreadyExists = false;
-	UMaterialInstanceConstant* ExistingValidMIC = nullptr;
-
-	// load the asset if it exists
-	UObject* ExistingAsset = UEditorAssetLibrary::LoadAsset(ObjectPath);
-
-	if (ExistingAsset && IsValid(ExistingAsset) && !ExistingAsset->IsUnreachable())
-	{
-		ExistingValidMIC = Cast<UMaterialInstanceConstant>(ExistingAsset);
-		if (ExistingValidMIC && IsValid(ExistingValidMIC))
-		{
-			bAssetAlreadyExists = true;
-		}
-	}
-
-	// If not loaded, check registry and disk
-	if (!bAssetAlreadyExists)
-	{
-		//Check asset registry
-		if (UEditorAssetLibrary::DoesAssetExist(ObjectPath))
-		{
-			//verify file exists on disk
-			FString PackageFilename;
-			if (FPackageName::TryConvertLongPackageNameToFilename(BasePackageName, PackageFilename, FPackageName::GetAssetPackageExtension()))
-			{
-				if (FPlatformFileManager::Get().GetPlatformFile().FileExists(*PackageFilename))
-				{
-					//File exists but object might be invalid - try to load again
-					ExistingAsset = UEditorAssetLibrary::LoadAsset(ObjectPath);
-					if (ExistingAsset && IsValid(ExistingAsset) && !ExistingAsset->IsUnreachable())
-					{
-						ExistingValidMIC = Cast<UMaterialInstanceConstant>(ExistingAsset);
-						if (ExistingValidMIC && IsValid(ExistingValidMIC))
-						{
-							bAssetAlreadyExists = true;
-						}
-					}
-				}
-			}
-		}
-	}
-
-	FMIForgeMaterialInstanceResolution Resolution;
-
-	FString FinalAssetName = FinalBaseAssetName;
-	FString FinalPackagePath = TargetPath;
-
-	if (bAssetAlreadyExists && ExistingAsset)
-	{
-		switch (IfMIExists)
-		{
-			case EIfMIExistsOption::Skip:
-			{
-				Resolution.Action = EMIForgeGenerationAction::Skipped;
-				Resolution.Message = FText::FromString(FString::Printf(TEXT("Skipped existing MI: %s"), *ObjectPath)
-				);
-				return Resolution;
-			}
-			case EIfMIExistsOption::Overwrite:
-			{
-				// Validate object is safe to modify
-				if (!IsValid(ExistingValidMIC) || ExistingValidMIC->IsUnreachable())
-				{
-					Resolution.Action = EMIForgeGenerationAction::Failed;
-					Resolution.Message = FText::FromString(FString::Printf(TEXT("Existing MI is invalid or pending deletion: %s"), *ObjectPath));
-					return Resolution;
-				}
-
-				Resolution.MaterialInstance = ExistingValidMIC;
-				Resolution.Action = EMIForgeGenerationAction::Updated;
-				return Resolution;
-
-			}
-			case EIfMIExistsOption::CreateUnique:
-			{
-				FString UniquePackageName;
-				FString UniqueAssetName;
-
-				AssetTools.CreateUniqueAssetName(
-					BasePackageName,
-					TEXT("_01"),
-					UniquePackageName,
-					UniqueAssetName
-				);
-
-				FinalAssetName = UniqueAssetName;
-				FinalPackagePath = FPackageName::GetLongPackagePath(UniquePackageName);
-				break;
-
-			}
-		}
-	}
-
-	// Create new MIC
-	UMaterialInstanceConstant* NewMIC =
-		Cast<UMaterialInstanceConstant>(
-			AssetTools.CreateAsset(
-				FinalAssetName,
-				FinalPackagePath,
-				UMaterialInstanceConstant::StaticClass(),
-				Factory
-			)
-		);
-	if (!NewMIC)
-	{
-		Resolution.Action = EMIForgeGenerationAction::Failed;
-		Resolution.Message = FText::FromString(
-			FString::Printf(TEXT("Failed to create MI for: %s"), *AssetName)
-		);
-		return Resolution;
-	}
-
-	Resolution.MaterialInstance = NewMIC;
-	Resolution.Action = EMIForgeGenerationAction::Created;
-	return Resolution;
-}
-
-bool FMIForgeMaterialInstanceGenerator::ApplyVertexPaintLayerTextures(UMaterialInstanceConstant* MaterialInstanceConstant, const FMIForgeVertexPaintLayerSlot& LayerSlot, bool bLayerGEnabled,
-	bool bLayerBEnabled, FText& OutError) const
-{
-	if (!MaterialInstanceConstant)
-	{
-		OutError = FText::FromString(TEXT("Material instance is invalid."));
-		return false;
-	}
-
-	const FMIForgeVertexPaintPresetDefinition& Definition =
-		FMIForgePresetDefinitions::GetVertexPaint();
-	const FMIForgeVertexPaintLayerDefinition* LayerDefinition =
-		Definition.FindLayer(LayerSlot.Layer);
-
-	if (!LayerDefinition)
-	{
-		OutError = FText::FromString(
-			FString::Printf(
-				TEXT("No preset definition configured for %s."),
-				*LayerSlot.DisplayName));
-		return false;
-	}
-
-	const bool bIsOptionalLayer = !LayerDefinition->bRequired;
-
-	const bool bLayerAssigned = LayerSlot.AssignedTextureSet.IsValid();
-
-	// Optional empty layers should not block generation.
-	if (bIsOptionalLayer && !bLayerAssigned)
-	{
-		if (LayerDefinition->EnabledSwitchParameter.IsNone())
-		{
-			OutError = FText::FromString(
-				FString::Printf(
-					TEXT("No static bool parameter configured for %s."),
-					*LayerSlot.DisplayName));
-			return false;
-		}
-
-		UMaterialEditingLibrary::SetMaterialInstanceStaticSwitchParameterValue(
-			MaterialInstanceConstant,
-			LayerDefinition->EnabledSwitchParameter,
-			false);
-
-		return true;
-	}
-
-	// Required layers must have Albedo.
-	if (!ApplyVertexPaintTexture(
-		MaterialInstanceConstant,
-		LayerSlot,
-		EMIForgeTextureType::Albedo,
-		TEXT("Albedo"),
-		true
-	))
-	{
-		OutError = FText::FromString(
-			FString::Printf(
-				TEXT("Failed to apply required Albedo texture for %s."),
-				*LayerSlot.DisplayName
-			)
-		);
-		return false;
-	}
-
-	// Optional textures. Missing ones warn and continue.
-	ApplyVertexPaintTexture(
-		MaterialInstanceConstant,
-		LayerSlot,
-		EMIForgeTextureType::Normal,
-		TEXT("Normal"),
-		false
-	);
-
-	ApplyVertexPaintTexture(
-		MaterialInstanceConstant,
-		LayerSlot,
-		EMIForgeTextureType::ORM,
-		TEXT("ORM"),
-		false
-	);
-
-	const bool bShouldApplyHeight =
-		(LayerSlot.Layer == EMIForgeVertexPaintLayer::LayerR && bLayerGEnabled) ||
-		(LayerSlot.Layer == EMIForgeVertexPaintLayer::LayerG && bLayerBEnabled);
-
-	if(LayerSlot.Layer == EMIForgeVertexPaintLayer::Base)
-	{
-		ApplyVertexPaintTexture(
-			MaterialInstanceConstant,
-			LayerSlot,
-			EMIForgeTextureType::Height,
-			TEXT("Height"),
-			false
-		);
-	}
-	else if (bShouldApplyHeight)
-	{
-		ApplyVertexPaintTexture(
-			MaterialInstanceConstant,
-			LayerSlot,
-			EMIForgeTextureType::Height,
-			TEXT("Height"),
-			false
-		);
-	}
-
-	// Enable optional layer switches deterministically.
-	if (bIsOptionalLayer)
-	{
-		if (LayerDefinition->EnabledSwitchParameter.IsNone())
-		{
-			OutError = FText::FromString(
-				FString::Printf(
-					TEXT("No static bool parameter configured for %s."),
-					*LayerSlot.DisplayName
-				)
-			);
-			return false;
-		}
-
-		UMaterialEditingLibrary::SetMaterialInstanceStaticSwitchParameterValue(
-			MaterialInstanceConstant,
-			LayerDefinition->EnabledSwitchParameter,
-			true
-		);
-	}
-
-
-	return true;
-}
-
-bool FMIForgeMaterialInstanceGenerator::ApplyVertexPaintTexture(UMaterialInstanceConstant* MaterialInstanceConstant, const FMIForgeVertexPaintLayerSlot& LayerSlot, EMIForgeTextureType TextureType, const TCHAR* DisplayName, bool bRequired)const
-{	
-	if (!MaterialInstanceConstant)
-	{
-		MIForgeUtilities::PrintLog(
-			TEXT("Material instance is invalid."),
-			ELogVerbosity::Error
-		);
-		return false;
-	}
-
-	if (!LayerSlot.AssignedTextureSet.IsValid())
-	{
-		const ELogVerbosity::Type Verbosity =
-			bRequired ? ELogVerbosity::Error : ELogVerbosity::Warning;
-
-		MIForgeUtilities::PrintLog(
-			FString::Printf(
-				TEXT("%s has no assigned texture set."),
-				*LayerSlot.DisplayName
-			),
-			Verbosity
-		);
-
-		return !bRequired;
-	}
-
-	const FMIForgeTextureSet& TextureSet = *LayerSlot.AssignedTextureSet;
-
-	const FMIForgeVertexPaintPresetDefinition& Definition =
-		FMIForgePresetDefinitions::GetVertexPaint();
-
-	const FMIForgeVertexPaintLayerDefinition* LayerDefinition =
-		Definition.FindLayer(LayerSlot.Layer);
-
-	if (!LayerDefinition)
-	{
-		MIForgeUtilities::PrintLog(
-			FString::Printf(
-				TEXT("No texture parameter mapping configured for %s."),
-				*LayerSlot.DisplayName
-			),
-			ELogVerbosity::Error
-		);
-		return false;
-	}
-
-	const FName* ParameterName =
-		LayerDefinition->TextureParameters.Find(TextureType);
-
-	if (!ParameterName || ParameterName->IsNone())
-	{
-		MIForgeUtilities::PrintLog(
-			FString::Printf(
-				TEXT("No material parameter mapping configured for %s %s."),
-				*LayerSlot.DisplayName,
-				DisplayName
-			),
-			ELogVerbosity::Error
-		);
-		return false;
-	}
-	
-	const FMIForgeTextureInfo* TextureInfo =
-		TextureSet.Textures.Find(TextureType);
-
-	UTexture* Texture = TextureInfo && TextureInfo->AssetData.IsValid()
-		? Cast<UTexture>(TextureInfo->AssetData.GetAsset())
-		: nullptr;
-
-	if (!Texture)
-
-	{
-		const ELogVerbosity::Type Verbosity =
-			bRequired ? ELogVerbosity::Error : ELogVerbosity::Warning;
-
-		MIForgeUtilities::PrintLog(
-			FString::Printf(
-				TEXT("%s texture not found or invalid for %s set: %s"),
-				DisplayName,
-				*LayerSlot.DisplayName,
-				*TextureSet.SetName
-			),
-			Verbosity
-		);
-
-		return !bRequired;
-	}
-
-	
-	UMaterialEditingLibrary::SetMaterialInstanceTextureParameterValue(
-		MaterialInstanceConstant,
-		*ParameterName,
-		Texture
-	);
-
-	/*if (!bApplied)
-	{
-		MIForgeUtilities::PrintLog(
-			FString::Printf(
-				TEXT("Failed to assign %s texture parameter '%s' for %s."),
-				DisplayName,
-				*ParameterName->ToString(),
-				*LayerSlot.DisplayName
-			),
-			ELogVerbosity::Error
-		);
-
-		return false;
-	}*/
-
-	return true;
-
-}
-

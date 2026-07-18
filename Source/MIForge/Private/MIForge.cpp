@@ -31,11 +31,6 @@ void FMIForgeModule::StartupModule()
 
 void FMIForgeModule::ShutdownModule()
 {	
-	// TODO:
-	// Store delegate handle and unregister
-	// ContentBrowser menu extension in Shutdown.
-	// (Not necessary for v1.0)
-
 	UnregisterBatchParameterEditorTabSpawner();
 	UnregisterTabSpawner();
 	FMIForgeStyle::Shutdown();

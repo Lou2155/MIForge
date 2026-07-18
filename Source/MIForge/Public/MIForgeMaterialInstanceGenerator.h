@@ -17,35 +17,12 @@ public:
 	) const;
 
 private:
-	/*UMaterialInstanceConstant* CreateOrGetMaterialInstance(
-		const FMIForgeTextureSet& TextureSet,
-		UMaterialInterface* ParentMaterial,
-		const FMIForgeGenerationOptions& Options,
-		FMIForgeGenerationResult& Result) const;*/
-
-	FMIForgeMaterialInstanceResolution ResolveMaterialInstance(
-		const FMIForgeTextureSet& TextureSet,
-		UMaterialInterface* ParentMaterial,
-		const FMIForgeGenerationOptions& Options,
-		IAssetTools& AssetTools
-	) const;
 
 	bool ApplyTexturesToMaterialInstance(
 		UMaterialInstanceConstant* MaterialInstanceConstant,
 		const FMIForgeTextureSet& TextureSet,
-		const FMIForgeGenerationOptions& Options
-	) const;
-
-	bool ApplyTexturesToStandardMaterialInstance(
-		UMaterialInstanceConstant* MaterialInstanceConstant,
-		const FMIForgeTextureSet& TextureSet,
-		const FMIForgeGenerationOptions& Options
-	) const;
-
-	bool ApplyTexturesToRGBMaterialInstance(
-		UMaterialInstanceConstant* MaterialInstanceConstant,
-		const FMIForgeTextureSet& TextureSet,
-		const FMIForgeGenerationOptions& Options
+		const FMIForgeGenerationOptions& Options, 
+		FText& OutError
 	) const;
 
 	bool ValidateGenerationInputs(
@@ -69,32 +46,7 @@ private:
 		FText& OutError
 	) const;
 
-	
 
-	FMIForgeMaterialInstanceResolution ResolveMaterialInstanceByName(
-		const FString& AssetName,
-		UMaterialInterface* ParentMaterial,
-		const FString& TargetPath,
-		EIfMIExistsOption IfMIExists,
-		IAssetTools& AssetTools
-	) const;
-
-	bool ApplyVertexPaintLayerTextures(
-		UMaterialInstanceConstant* MaterialInstance,
-		const FMIForgeVertexPaintLayerSlot& LayerSlot,
-		bool bLayerGEnabled,
-		bool bLayerBEnabled,
-		FText& OutError
-	) const;
-
-	bool ApplyVertexPaintTexture(
-		UMaterialInstanceConstant* MaterialInstanceConstant,
-		const FMIForgeVertexPaintLayerSlot& LayerSlot,
-		EMIForgeTextureType TextureType,
-		const TCHAR* DisplayName,
-		bool bRequired
-
-	) const;
 };
 
 
