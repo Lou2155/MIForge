@@ -4,7 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "MIForgeTypes.h"
-class IAssetTools;
+
+
 
 class FMIForgeMaterialInstanceGenerator
 {
@@ -15,37 +16,6 @@ public:
 		const FMIForgeVertexPaintLayerStack& LayerStack,
 		const FMIForgeVertexPaintGenerationOptions& Options
 	) const;
-
-private:
-
-	bool ApplyTexturesToMaterialInstance(
-		UMaterialInstanceConstant* MaterialInstanceConstant,
-		const FMIForgeTextureSet& TextureSet,
-		const FMIForgeGenerationOptions& Options, 
-		FText& OutError
-	) const;
-
-	bool ValidateGenerationInputs(
-		const FMIForgeTextureSet& TextureSet,
-		UMaterialInterface* ParentMaterial,
-		const FMIForgeGenerationOptions& Options,
-		FText& OutError
-	) const;
-
-	bool ValidateStandardGenerationInputs(
-		const FMIForgeTextureSet& TextureSet,
-		UMaterialInterface* ParentMaterial,
-		const FMIForgeGenerationOptions& Options,
-		FText& OutError
-	) const;
-
-	bool ValidateRGBGenerationInputs(
-		const FMIForgeTextureSet& TextureSet,
-		UMaterialInterface* ParentMaterial,
-		const FMIForgeGenerationOptions& Options,
-		FText& OutError
-	) const;
-
 
 };
 
