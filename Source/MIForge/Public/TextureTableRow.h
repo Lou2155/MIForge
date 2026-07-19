@@ -4,8 +4,7 @@
 
 #include "CoreMinimal.h"
 struct FMIForgeTextureInfo;
-
-class SMainTabWidget;
+class FMIForgeMainTabViewModel;
 /**
  * 
  */
@@ -14,7 +13,7 @@ class STextureTableRow : public SMultiColumnTableRow<TSharedPtr<FMIForgeTextureI
 public:
 	SLATE_BEGIN_ARGS(STextureTableRow) {}
 		SLATE_ARGUMENT(TSharedPtr<FMIForgeTextureInfo>, TextureListItems)
-		SLATE_ARGUMENT(TSharedPtr<SMainTabWidget>, ParentTable)
+		SLATE_ARGUMENT(TSharedPtr<FMIForgeMainTabViewModel>, ViewModel)
 	SLATE_END_ARGS()
 
 public:
@@ -23,6 +22,6 @@ public:
 
 private:
 	TSharedPtr<FMIForgeTextureInfo> TextureListItems;
-	TSharedPtr<SMainTabWidget> ParentTable;
+	TSharedPtr<FMIForgeMainTabViewModel> ViewModel;
 	
 };

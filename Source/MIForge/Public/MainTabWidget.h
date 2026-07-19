@@ -6,6 +6,7 @@
 #include "MIForgeTypes.h"
 #include "MIForgeVertexPaintRecipeManager.h"
 
+class FMIForgeMainTabViewModel;
 
 class SMainTabWidget : public SCompoundWidget
 {
@@ -22,53 +23,11 @@ public:
 
 	~SMainTabWidget();
 
-	template<typename T>
-	void SelectItem(TArray<T>& SelectedItems, const T& Item)
-	{
-		SelectedItems.AddUnique(Item);
-	}
-
-	template<typename T>
-	void UnselectItem(TArray<T>& SelectedItems, const T& Item)
-	{
-		SelectedItems.Remove(Item);
-	}
-
-	template<typename T>
-	bool IsItemSelected(const TArray<T>& SelectedItems, const T& Item) const
-	{
-		return SelectedItems.Contains(Item);
-	}
-
-	/*void SelectAssets(TSharedPtr<FMIForgeTextureInfo> AssetData);
-	void UnselectAssets(TSharedPtr<FMIForgeTextureInfo> AssetData);
-	bool IsAssetSelected(TSharedPtr<FMIForgeTextureInfo> AssetData) const;*/
-
-	void SelectTexture(TSharedPtr<FMIForgeTextureInfo> Item);
-	void UnselectTexture(TSharedPtr<FMIForgeTextureInfo> Item);
-	bool IsTextureSelected(TSharedPtr<FMIForgeTextureInfo> Item) const;
-
-	void SelectTextureSet(TSharedPtr<FMIForgeTextureSet> Item);
-	void UnselectTextureSet(TSharedPtr<FMIForgeTextureSet> Item);
-	bool IsTextureSetSelected(TSharedPtr<FMIForgeTextureSet> Item) const;
-
 	void SelectTexturesInSet(const FMIForgeTextureSet& TextureSet);
 	void UnselectTexturesInSet(const FMIForgeTextureSet& TextureSet);
 
-	bool bUseEmissiveTextures = false;
-	bool bUseDetailNormalTextures = false;
-	bool bUseTriplanarProjection = false;
-
-	bool bUseBaseORMTexture = true;
-	bool bEnableEmissiveChannel = false;
-	bool bUseDetailNormalTextureRGB = false;
-
-	bool bIgnoreUnrecognizedTextures = false;
-
-	TSharedPtr<FString> CurrentPresetOption;
-
-	void RefreshValidationSummary();
 	void RefreshVertexPaintLayerThumbnail(EMIForgeVertexPaintLayer Layer);
+
 
 private:
 	FDelegateHandle AddAssetHandle;
@@ -134,9 +93,6 @@ private:
 	TSharedRef<SWidget> CreateRGBmaskingValidationDetailsWidget();
 	TSharedRef<SWidget> CreateVertexPaintLayerThumbnailWidget(EMIForgeVertexPaintLayer Layer);
 
-	void AssignSelectedTextureSetToVertexLayer(EMIForgeVertexPaintLayer Layer);
-	void ClearVertexLayerAssignment(EMIForgeVertexPaintLayer Layer);
-	FMIForgeVertexPaintLayerSlot* GetVertexPaintLayerSlot(EMIForgeVertexPaintLayer Layer);
 	FText GetVertexPaintLayerStatusText(EMIForgeVertexPaintLayer Layer) const;
 	FText GetVertexPaintValidationSummaryText() const;
 	FSlateColor GetVertexPaintLayerStatusColor(EMIForgeVertexPaintLayer Layer) const;
@@ -147,11 +103,9 @@ private:
 
 private:
 	TArray<FString> SelectedFolderPaths;
-	TSharedPtr<STextBlock> PresetComboBoxSelectedOptionText;
 	
 	TSharedPtr<SWidgetSwitcher> PresetPannelSwitcher0;
 	//TSharedPtr<SEditableTextBox> TargetPathInputBox;
-	FString CurrentTargetPath;
 
 	TSharedPtr<SInlineEditableTextBlock> TexturePathTextBlock;
 #pragma region Filter related members
@@ -180,35 +134,13 @@ private:
 
 	TArray<TSharedPtr<FMIForgeTextureInfo>> TextureListItems;
 	TArray<TSharedPtr<FMIForgeTextureInfo>> FilteredTextureListItems;
-	TArray<TSharedPtr<FMIForgeTextureInfo>> SelectedTextureItems;
+	
 
 	TArray<TSharedPtr<FMIForgeTextureSet>> TextureSetListItems;
 	TArray<TSharedPtr<FMIForgeTextureSet>> FilteredTextureSetListItems;
-	TArray<TSharedPtr<FMIForgeTextureSet>> SelectedTextureSetItems;
+	
 
 	TArray<TSharedPtr<FMIForgeTextureInfo>> ResolvedTextures;
-
-	FMIForgeValidationSummary CurrentValidationSummary;
-	FMIForgeVertexPaintLayerStackValidationResult CurrentVertexPaintValidationResult;
-	FMIForgeVertexPaintValidationSummary CurrentVertexPaintValidationSummary;
-
-
-
-	// Currently selected option (default Skip)
-	EIfMIExistsOption CurrentIfMIExistsOption = EIfMIExistsOption::Skip;
-
-	enum class EMIForgeInputMode : uint8
-	{
-		IndividualTextures,
-		TextureSets
-	};
-
-	TArray<TSharedPtr<FMIForgeTextureSet>> BuildGenerationTextureSets() const;
-
-	EMIForgeInputMode CurrentInputMode =
-		EMIForgeInputMode::IndividualTextures;
-
-	FMIForgeVertexPaintLayerStack VertexPaintLayerStack;
 
 	TSharedPtr<FAssetThumbnailPool> AssetThumbnailPool;
 	TSharedPtr<SBox> BaseLayerThumbnailBox;
@@ -226,7 +158,16 @@ private:
 
 	TSharedPtr<STextBlock> CurrentVertexPaintRecipeOptionText;
 
+	TSharedPtr<FMIForgeMainTabViewModel> ViewModel;
+
+	TArray<TSharedPtr<EMIForgeGenerationPreset>>
+		PresetOptions;
+
+	void HandlePresetChanged(
+		EMIForgeGenerationPreset NewPreset);
+
+	void HandleGenerationOptionsChanged();
+	void HandleSelectionChanged();
+	void HandleVertexPaintChanged();
 	
-
-
 };

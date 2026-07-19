@@ -4,13 +4,13 @@
 #include "TextureTableRow.h"
 #include "MIForgeTypes.h"
 #include "EditorAssetLibrary.h"
-#include "MainTabWidget.h"
 #include "MIForgeUtilities.h"
+#include "UIs/MIForgeMainTabViewModel.h"
 
 void STextureTableRow::Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& OwnerTableView)
 {	
 	TextureListItems = InArgs._TextureListItems;
-	ParentTable = InArgs._ParentTable;
+	ViewModel = InArgs._ViewModel;
 	SMultiColumnTableRow::Construct(FSuperRowType::FArguments(), OwnerTableView);
 }
 
@@ -23,16 +23,18 @@ TSharedRef<SWidget> STextureTableRow::GenerateWidgetForColumn(const FName& Colum
 			.OnCheckStateChanged_Lambda([this](ECheckBoxState CheckState) {
 				switch (CheckState) {
 				case ECheckBoxState::Checked:
-					ParentTable->SelectTexture(TextureListItems);
+					if (ViewModel.IsValid()) ViewModel->SelectTexture(TextureListItems);
 					break;
 				case ECheckBoxState::Unchecked:
-					ParentTable->UnselectTexture(TextureListItems);
+					if (ViewModel.IsValid()) ViewModel->UnselectTexture(TextureListItems);
 					break;
 				}
 
 				})
 			.IsChecked_Lambda([this]() -> ECheckBoxState {
-				return ParentTable->IsTextureSelected(TextureListItems) ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+				return ViewModel.IsValid() && ViewModel->IsTextureSelected(TextureListItems)
+					? ECheckBoxState::Checked
+					: ECheckBoxState::Unchecked;
 				})
 		);
 	}

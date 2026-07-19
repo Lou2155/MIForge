@@ -225,7 +225,7 @@ struct FMIForgeVertexPaintLayerSlot
         return AssignedTextureSet.IsValid();
     }
 
-    FString GetAddedTextureTypeText()
+    FString GetAddedTextureTypeText() const
     {   
 		FString AddedTypesText;
 

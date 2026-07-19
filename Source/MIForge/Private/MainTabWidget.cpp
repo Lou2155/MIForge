@@ -23,7 +23,7 @@
 #include "Presets/MIForgePresetDefinitions.h"
 #include "Generation/MIForgeGenerationCoordinator.h"
 
-
+#include "UIs/MIForgeMainTabViewModel.h"
 
 
 #define LOCTEXT_NAMESPACE "MainTabWidget"
@@ -79,6 +79,37 @@ namespace
 }
 
 void SMainTabWidget::Construct(const FArguments& InArgs) {
+
+	ViewModel = MakeShared<FMIForgeMainTabViewModel>();
+
+	PresetOptions =
+	{
+		MakeShared<EMIForgeGenerationPreset>(
+			EMIForgeGenerationPreset::Standard),
+
+		MakeShared<EMIForgeGenerationPreset>(
+			EMIForgeGenerationPreset::RGBMask),
+
+		MakeShared<EMIForgeGenerationPreset>(
+			EMIForgeGenerationPreset::VertexPainting)
+	};
+
+	ViewModel->OnPresetChanged.AddSP(
+		SharedThis(this),
+		&SMainTabWidget::HandlePresetChanged);
+
+	ViewModel->OnGenerationOptionsChanged.AddSP(
+		SharedThis(this),
+		&SMainTabWidget::HandleGenerationOptionsChanged);
+
+	ViewModel->OnSelectionChanged.AddSP(
+		SharedThis(this),
+		&SMainTabWidget::HandleSelectionChanged);
+
+	ViewModel->OnVertexPaintChanged.AddSP(
+		SharedThis(this),
+		&SMainTabWidget::HandleVertexPaintChanged);
+
 	FMIForgeAssetScanner Scanner;
 	FMIForgeTextureClassifier Classifier;
 	FMIForgeTextureSetBuilder SetBuilder;
@@ -114,38 +145,12 @@ void SMainTabWidget::Construct(const FArguments& InArgs) {
 	CurrentTextureSetFilterOption = TextureSetFilterOptions[0];
 	CurrentFilterOption = CurrentTextureFilterOption;
 
-	CurrentPresetOption = MakeShared<FString>(TEXT("Standard"));
 	CurrentMaxLayersOption = MakeShared<FString>(TEXT("2 (R)"));
 
 	RefreshFilteredTextures();
 	RefreshFilteredTextureSets();
 	
 	BindActionsToOnAssetsChanged();
-
-	// Initialize the vertex paint layer stack with default values
-#pragma region VertexPaintLayerStackInitialization
-	const FMIForgeVertexPaintPresetDefinition&
-		VertexPaintDefinition =
-		FMIForgePresetDefinitions::GetVertexPaint();
-
-	for (const FMIForgeVertexPaintLayerDefinition& LayerDefinition :
-		VertexPaintDefinition.Layers)
-	{
-		FMIForgeVertexPaintLayerSlot* Slot =
-			GetVertexPaintLayerSlot(LayerDefinition.Layer); //get VertexPaintlayerStack.layer
-
-		if (!Slot)
-		{
-			continue;
-		}
-
-		Slot->Layer = LayerDefinition.Layer;
-		Slot->DisplayName = LayerDefinition.DisplayName;
-		Slot->ChannelName = LayerDefinition.ChannelName;
-		Slot->bRequired = LayerDefinition.bRequired;
-	}
-
-#pragma endregion
 
 	AssetThumbnailPool = MakeShared<FAssetThumbnailPool>(64);
 
@@ -275,59 +280,10 @@ SMainTabWidget::~SMainTabWidget()
 	}
 }
 
-//void SMainTabWidget::SelectAssets(TSharedPtr<FMIForgeTextureInfo> AssetData)
-//{
-//	SelectedTextureItems.AddUnique(AssetData);
-//}
-//
-//void SMainTabWidget::UnselectAssets(TSharedPtr<FMIForgeTextureInfo> AssetData)
-//{
-//	SelectedTextureItems.Remove(AssetData);
-//}
-//
-//bool SMainTabWidget::IsAssetSelected(TSharedPtr<FMIForgeTextureInfo> AssetData) const
-//{
-//	return SelectedTextureItems.Contains(AssetData);
-//}
-
-void SMainTabWidget::SelectTexture(TSharedPtr<FMIForgeTextureInfo> Item)
-{
-	SelectItem(SelectedTextureItems, Item);
-	RefreshValidationSummary();
-}
-
-void SMainTabWidget::UnselectTexture(TSharedPtr<FMIForgeTextureInfo> Item)
-{
-	UnselectItem(SelectedTextureItems, Item);
-	RefreshValidationSummary();
-}
-
-bool SMainTabWidget::IsTextureSelected(TSharedPtr<FMIForgeTextureInfo> Item) const
-{
-	return IsItemSelected(SelectedTextureItems, Item);
-
-}
-
-void SMainTabWidget::SelectTextureSet(TSharedPtr<FMIForgeTextureSet> Item)
-{
-	SelectItem(SelectedTextureSetItems, Item);
-	RefreshValidationSummary();
-}
-
-void SMainTabWidget::UnselectTextureSet(TSharedPtr<FMIForgeTextureSet> Item)
-{
-	UnselectItem(SelectedTextureSetItems, Item);
-	RefreshValidationSummary();
-}
-
-bool SMainTabWidget::IsTextureSetSelected(TSharedPtr<FMIForgeTextureSet> Item) const
-{
-	return IsItemSelected(SelectedTextureSetItems, Item);
-}
-
 void SMainTabWidget::SelectTexturesInSet(const FMIForgeTextureSet& TextureSet)
 {
-	auto SelectTextureType = [this, &TextureSet](EMIForgeTextureType Type)
+	TArray<TSharedPtr<FMIForgeTextureInfo>> NewSelection = ViewModel->GetSelectedTextures();
+	auto SelectTextureType = [this, &TextureSet, &NewSelection](EMIForgeTextureType Type)
 		{
 			if (const FMIForgeTextureInfo* TextureInfo = TextureSet.Textures.Find(Type))
 			{
@@ -335,62 +291,50 @@ void SMainTabWidget::SelectTexturesInSet(const FMIForgeTextureSet& TextureSet)
 
 				if (ExistingItem.IsValid())
 				{
-					SelectedTextureItems.AddUnique(ExistingItem);
+					NewSelection.AddUnique(ExistingItem);
 				}
 			}
 		};
 
-	if(CurrentPresetOption.IsValid() && *CurrentPresetOption == TEXT("Standard"))
+	if(ViewModel.IsValid() && ViewModel->GetPreset() == EMIForgeGenerationPreset::Standard)
 	{
 		SelectTextureType(EMIForgeTextureType::Albedo);
 		SelectTextureType(EMIForgeTextureType::Normal);
 		SelectTextureType(EMIForgeTextureType::ORM);
 
-		if (bUseEmissiveTextures)
+		if (ViewModel->GetUseEmissiveTextures())
 		{
 			SelectTextureType(EMIForgeTextureType::Emissive);
 		}
 
-		if (bUseDetailNormalTextures)
+		if (ViewModel->GetUseDetailNormalTextures())
 		{
 			SelectTextureType(EMIForgeTextureType::DetailNormal);
 		}
 	}
-	else if (CurrentPresetOption.IsValid() && *CurrentPresetOption == TEXT("RGB Masking"))
+	else if (ViewModel.IsValid() && ViewModel->GetPreset() == EMIForgeGenerationPreset::RGBMask)
 	{
 		SelectTextureType(EMIForgeTextureType::Albedo);
 		SelectTextureType(EMIForgeTextureType::Normal);
 		SelectTextureType(EMIForgeTextureType::RGB);
 
-		if(bUseBaseORMTexture)
+		if(ViewModel->GetUseBaseORMTexture())
 		{
 			SelectTextureType(EMIForgeTextureType::ORM);
 		}
 		
-		if(bUseDetailNormalTextureRGB)
+		if(ViewModel->GetUseDetailNormalTextureRGB())
 		{
 			SelectTextureType(EMIForgeTextureType::DetailNormal);
 		}
 	}
-	else 
-	{	//Todo: handle other presets here if needed in the future
-		if (TexListView.IsValid())
-		{
-			TexListView->RequestListRefresh();
-			RefreshValidationSummary();
-		}
-	}
-
-	if (TexListView.IsValid())
-	{
-		TexListView->RequestListRefresh();
-		RefreshValidationSummary();
-	}
+	ViewModel->SetSelectedTextures(NewSelection);
 }
 
 void SMainTabWidget::UnselectTexturesInSet(const FMIForgeTextureSet& TextureSet)
 {
-	auto UnselectTextureType = [this, &TextureSet](EMIForgeTextureType Type)
+	TArray<TSharedPtr<FMIForgeTextureInfo>> NewSelection = ViewModel->GetSelectedTextures();
+	auto UnselectTextureType = [this, &TextureSet, &NewSelection](EMIForgeTextureType Type)
 		{
 			if (const FMIForgeTextureInfo* TextureInfo = TextureSet.Textures.Find(Type))
 			{
@@ -398,55 +342,42 @@ void SMainTabWidget::UnselectTexturesInSet(const FMIForgeTextureSet& TextureSet)
 
 				if (ExistingItem.IsValid())
 				{
-					SelectedTextureItems.Remove(ExistingItem);
+					NewSelection.Remove(ExistingItem);
 				}
 			}
 		};
-	if (CurrentPresetOption.IsValid() && *CurrentPresetOption == TEXT("Standard"))
+	if (ViewModel.IsValid() && ViewModel->GetPreset() == EMIForgeGenerationPreset::Standard)
 	{
 		UnselectTextureType(EMIForgeTextureType::Albedo);
 		UnselectTextureType(EMIForgeTextureType::Normal);
 		UnselectTextureType(EMIForgeTextureType::ORM);
 
-		if (bUseEmissiveTextures)
+		if (ViewModel->GetUseEmissiveTextures())
 		{
 			UnselectTextureType(EMIForgeTextureType::Emissive);
 		}
 
-		if (bUseDetailNormalTextures)
+		if (ViewModel->GetUseDetailNormalTextures())
 		{
 			UnselectTextureType(EMIForgeTextureType::DetailNormal);
 		}
 	}
-	else if(CurrentPresetOption.IsValid() && *CurrentPresetOption == TEXT("RGB Masking"))
+	else if(ViewModel.IsValid() && ViewModel->GetPreset() == EMIForgeGenerationPreset::RGBMask)
 	{
 		UnselectTextureType(EMIForgeTextureType::Albedo);
 		UnselectTextureType(EMIForgeTextureType::Normal);
 		UnselectTextureType(EMIForgeTextureType::RGB);
-		if (bUseBaseORMTexture)
+		if (ViewModel->GetUseBaseORMTexture())
 		{
 			UnselectTextureType(EMIForgeTextureType::ORM);
 		}
 	
-		if (bUseDetailNormalTextureRGB)
+		if (ViewModel->GetUseDetailNormalTextureRGB())
 		{
 			UnselectTextureType(EMIForgeTextureType::DetailNormal);
 		}
 	}
-	else
-	{	
-		if (TexListView.IsValid())
-		{
-			TexListView->RequestListRefresh();
-			RefreshValidationSummary();
-		}
-	}
-
-	if (TexListView.IsValid())
-	{
-		TexListView->RequestListRefresh();
-		RefreshValidationSummary();
-	}
+	ViewModel->SetSelectedTextures(NewSelection);
 }
 
 void SMainTabWidget::QueueListRefresh()
@@ -556,23 +487,23 @@ void SMainTabWidget::RefreshFilteredTextureSets()
 			if (bUseTypeFilter)
 			{
 				FMIForgeValidator::EMIForgeTextureSetStatus Status;
-				if (CurrentPresetOption.IsValid() && *CurrentPresetOption == TEXT("RGB Masking"))
+				if (ViewModel.IsValid() && ViewModel->GetPreset() == EMIForgeGenerationPreset::RGBMask)
 				{
 					Status = Validator.GetRGBSetStatus(
 						*TextureSet,
-						bUseBaseORMTexture,
-						bEnableEmissiveChannel,
-						bUseDetailNormalTextureRGB,
-						bIgnoreUnrecognizedTextures
+						ViewModel->GetUseBaseORMTexture(),
+						ViewModel->GetEnableEmissiveChannel(),
+						ViewModel->GetUseDetailNormalTextureRGB(),
+						ViewModel->GetIgnoreUnrecognizedTextures()
 					);
 				}
 				else
 				{
 					Status = Validator.GetStandardSetStatus(
 						*TextureSet,
-						bUseEmissiveTextures,
-						bUseDetailNormalTextures,
-						bIgnoreUnrecognizedTextures
+						ViewModel->GetUseEmissiveTextures(),
+						ViewModel->GetUseDetailNormalTextures(),
+						ViewModel->GetIgnoreUnrecognizedTextures()
 					);
 				}
 
@@ -617,8 +548,7 @@ void SMainTabWidget::RefreshListViews()
 {
 	if (TexListView.IsValid() && TexSetListView.IsValid())
 	{	
-		SelectedTextureItems.Empty();
-		SelectedTextureSetItems.Empty();
+		ViewModel->ClearAllSelections();
 
 		FMIForgeAssetScanner Scanner;
 		FMIForgeTextureClassifier Classifier;
@@ -681,11 +611,11 @@ TSharedPtr<SWidget> SMainTabWidget::GenerateRightClickMenuWidget()
 		FSlateIcon(),
 		FUIAction(FExecuteAction::CreateLambda([this]()
 			{
-				if(CurrentInputMode == EMIForgeInputMode::IndividualTextures)
+				if(ViewModel->GetInputMode() == EMIForgeInputMode::IndividualTextures)
 				{
-					if (SelectedTextureItems.Num() > 0) {
+					if (ViewModel->GetSelectedTextures().Num() > 0) {
 						TArray<FAssetData> AssetsToSelect;
-						for (const TSharedPtr<FMIForgeTextureInfo>& TextureInfo : SelectedTextureItems)
+						for (const TSharedPtr<FMIForgeTextureInfo>& TextureInfo : ViewModel->GetSelectedTextures())
 						{
 							if (TextureInfo.IsValid())
 							{
@@ -719,9 +649,9 @@ TSharedPtr<SWidget> SMainTabWidget::GenerateRightClickMenuWidget()
 				}
 				else
 				{
-					if (SelectedTextureSetItems.Num() > 0) {
+					if (ViewModel->GetSelectedTextureSets().Num() > 0) {
 						TArray<FAssetData> AssetsToSelect;
-						for (const TSharedPtr<FMIForgeTextureSet>& TextureSet : SelectedTextureSetItems)
+						for (const TSharedPtr<FMIForgeTextureSet>& TextureSet : ViewModel->GetSelectedTextureSets())
 						{
 							if (TextureSet.IsValid())
 							{
@@ -783,11 +713,9 @@ TSharedPtr<SWidget> SMainTabWidget::GenerateRightClickMenuWidget()
 		FSlateIcon(),
 		FUIAction(FExecuteAction::CreateLambda([this]()
 			{
-				SelectedTextureItems.Empty();
-				SelectedTextureSetItems.Empty();
+				ViewModel->ClearAllSelections();
 				TexListView->ClearSelection();
 				TexSetListView->ClearSelection();
-				RefreshValidationSummary();
 			}))
 		);
 	MenuBuilder.AddMenuEntry(
@@ -797,27 +725,19 @@ TSharedPtr<SWidget> SMainTabWidget::GenerateRightClickMenuWidget()
 		FUIAction(
 			FExecuteAction::CreateLambda([this]()
 				{
-					if (CurrentInputMode == EMIForgeInputMode::TextureSets)
+					if (ViewModel->GetInputMode() == EMIForgeInputMode::TextureSets)
 					{
-						bIgnoreUnrecognizedTextures = !bIgnoreUnrecognizedTextures;
-
-						RefreshValidationSummary();
-						RefreshFilteredTextureSets();
-
-						if (TexSetListView.IsValid())
-						{
-							TexSetListView->RequestListRefresh();
-						}
+						ViewModel->SetIgnoreUnrecognizedTextures(!ViewModel->GetIgnoreUnrecognizedTextures());
 
 					}
 				}),
 			FCanExecuteAction::CreateLambda([this]()
 				{
-					return CurrentInputMode == EMIForgeInputMode::TextureSets;
+					return ViewModel->GetInputMode() == EMIForgeInputMode::TextureSets;
 				}),
 			FIsActionChecked::CreateLambda([this]()
 				{
-					return bIgnoreUnrecognizedTextures;
+					return ViewModel->GetIgnoreUnrecognizedTextures();
 				})
 		),
 		NAME_None,
@@ -903,10 +823,9 @@ TSharedRef<SWidget> SMainTabWidget::Page1()
 								.OnClicked_Lambda([this]() {
 								MIForgeUtilities::CreatePathSelector(SharedThis(this), FOnPathSelected::CreateLambda([this](const FString& SelectedPath) {
 									SelectedFolderPaths.Empty();
-									SelectedTextureSetItems.Empty();
+									ViewModel->ClearTextureSetSelection();
 									SelectedFolderPaths.Add(SelectedPath);
 									TexturePathTextBlock->SetText(FText::FromString(SelectedPath));
-									RefreshValidationSummary();
 									QueueListRefresh();
 									
 									}));
@@ -949,19 +868,18 @@ TSharedRef<SWidget> SMainTabWidget::Page1()
 							SNew(SSegmentedControl<int32>)
 								.IsEnabled_Lambda([this]()
 									{
-										return !CurrentPresetOption.IsValid() ||
-											*CurrentPresetOption != TEXT("Vertex Painting");
+										return !ViewModel.IsValid() || ViewModel->GetPreset() != EMIForgeGenerationPreset::VertexPainting;
 									})
 								.Value_Lambda([this]()
 									{
-										return CurrentInputMode == EMIForgeInputMode::TextureSets ? 1 : 0;
+										return ViewModel->GetInputMode() == EMIForgeInputMode::TextureSets ? 1 : 0;
 									})
 								.OnValueChanged_Lambda([this](int32 Val) {
 
-								CurrentInputMode = Val == 1 ? EMIForgeInputMode::TextureSets : EMIForgeInputMode::IndividualTextures;
+								ViewModel->SetInputMode(Val == 1 ? EMIForgeInputMode::TextureSets : EMIForgeInputMode::IndividualTextures);
 								ViewModeSwitcher0->SetActiveWidgetIndex(Val);
 
-								if (CurrentInputMode == EMIForgeInputMode::IndividualTextures)
+								if (ViewModel->GetInputMode() == EMIForgeInputMode::IndividualTextures)
 								{
 									ActiveFilterOptions = TextureFilterOptions;
 									CurrentFilterOption = CurrentTextureFilterOption;
@@ -986,8 +904,6 @@ TSharedRef<SWidget> SMainTabWidget::Page1()
 										FText::FromString(*CurrentFilterOption)
 									);
 								}
-
-								RefreshValidationSummary();
 
 									})
 
@@ -1026,7 +942,7 @@ TSharedRef<SWidget> SMainTabWidget::Page1()
 
 									CurrentFilterOption = Option;
 
-									if (CurrentInputMode == EMIForgeInputMode::IndividualTextures)
+									if (ViewModel->GetInputMode() == EMIForgeInputMode::IndividualTextures)
 									{
 										CurrentTextureFilterOption = Option;
 										RefreshFilteredTextures();
@@ -1057,7 +973,7 @@ TSharedRef<SWidget> SMainTabWidget::Page1()
 								SNew(SSearchBox)
 									.OnTextChanged_Lambda([this](const FText& InText) {
 										CurrentSearchText = InText;
-										if (CurrentInputMode == EMIForgeInputMode::IndividualTextures)
+										if (ViewModel->GetInputMode() == EMIForgeInputMode::IndividualTextures)
 										{
 											RefreshFilteredTextures();
 
@@ -1104,7 +1020,7 @@ TSharedRef<SWidget> SMainTabWidget::Page1()
 												SNew(STextBlock)
 
 													.Text_Lambda([this]() {
-													if (CurrentInputMode == EMIForgeInputMode::IndividualTextures)
+												if (ViewModel->GetInputMode() == EMIForgeInputMode::IndividualTextures)
 													{
 														return FText::FromString(FString::Printf(TEXT("Detected Textures: %d/%d"), FilteredTextureListItems.Num(), TextureListItems.Num()));
 													}
@@ -1167,71 +1083,35 @@ TSharedRef<SWidget> SMainTabWidget::PresetComboBox()
 		+ SHorizontalBox::Slot()
 		.AutoWidth()
 		[
-			SNew(SComboBox<TSharedPtr<FString>>)
-				.OptionsSource(new TArray<TSharedPtr<FString>>{ MakeShared<FString>(TEXT("Standard")), MakeShared<FString>(TEXT("RGB Masking")), MakeShared<FString>(TEXT("Vertex Painting")) })
-				.OnGenerateWidget_Lambda([](TSharedPtr<FString> InItem) {
-				return SNew(STextBlock).Text(FText::FromString(*InItem));
+			SNew(SComboBox<TSharedPtr<EMIForgeGenerationPreset>>)
+				.OptionsSource(&PresetOptions)
+				.OnGenerateWidget_Lambda([](TSharedPtr<EMIForgeGenerationPreset> InItem) {
+				const FText Label =
+					InItem.IsValid()
+					? FMIForgeMainTabViewModel::
+					GetPresetDisplayText(*InItem)
+					: FText::GetEmpty();
+
+				return SNew(STextBlock)
+					.Text(Label);
 					})
-				.OnSelectionChanged_Lambda([this](TSharedPtr<FString> Option, ESelectInfo::Type SelectInfo) {
+				.OnSelectionChanged_Lambda([this](TSharedPtr<EMIForgeGenerationPreset> Item, ESelectInfo::Type SelectInfo) {
 
-				if (Option.IsValid())
+				if (ViewModel.IsValid() && Item.IsValid())
 				{
-					CurrentPresetOption = Option;
-					PresetComboBoxSelectedOptionText->SetText(FText::FromString(*Option));
-
-					if (*CurrentPresetOption == FString("Standard")) {
-						PresetPannelSwitcher0->SetActiveWidgetIndex(0);
-						TexSetListView->RequestListRefresh();
-						RefreshValidationSummary();
-					}
-					else if (*CurrentPresetOption == FString("RGB Masking")) {
-						PresetPannelSwitcher0->SetActiveWidgetIndex(1);
-						TexSetListView->RequestListRefresh();
-						RefreshValidationSummary();
-					}
-					else if (*CurrentPresetOption == FString("Vertex Painting")) {
-						PresetPannelSwitcher0->SetActiveWidgetIndex(2);
-
-						CurrentInputMode = EMIForgeInputMode::TextureSets;
-
-						if (ViewModeSwitcher0.IsValid())
-						{
-							ViewModeSwitcher0->SetActiveWidgetIndex(1);
-						}
-
-						SelectedTextureItems.Empty();
-
-						ActiveFilterOptions = TextureSetFilterOptions;
-						CurrentFilterOption = CurrentTextureSetFilterOption;
-
-						if (FilterComboBox.IsValid())
-						{
-							FilterComboBox->RefreshOptions();
-						}
-
-						if (CurrentFilterComboBoxSelectedOptionText.IsValid() &&
-							CurrentFilterOption.IsValid())
-						{
-							CurrentFilterComboBoxSelectedOptionText->SetText(
-								FText::FromString(*CurrentFilterOption)
-							);
-						}
-
-						RefreshFilteredTextureSets();
-						RefreshValidationSummary();
-
-						if (TexSetListView.IsValid())
-						{
-							TexSetListView->RequestListRefresh();
-						}
-					}
+					ViewModel->SetPreset(*Item);
 				}
 				
 					})
 				.Content()
 				[
-					SAssignNew(PresetComboBoxSelectedOptionText, STextBlock)
-						.Text(FText::FromString(TEXT("Select a Preset")))
+					SNew(STextBlock)
+						.Text_Lambda([this]()
+							{
+								return ViewModel.IsValid()
+									? ViewModel->GetPresetDisplayText()
+									: FText::GetEmpty();
+							})
 				]
 		];
 }
@@ -1284,7 +1164,7 @@ TSharedRef<SWidget> SMainTabWidget::IndividualModeListView()
 		.OnGenerateRow_Lambda([this](TSharedPtr<FMIForgeTextureInfo> Item, const TSharedRef<STableViewBase>& OwnerTable) {
 		return SNew(STextureTableRow, OwnerTable)
 			.TextureListItems(Item)
-			.ParentTable(SharedThis(this));
+			.ViewModel(ViewModel);
 		
 			})
 		.HeaderRow(SetupHeaderRow())
@@ -1300,7 +1180,8 @@ TSharedRef<SWidget> SMainTabWidget::TextureSetModeListView()
 		.OnGenerateRow_Lambda([this](TSharedPtr<FMIForgeTextureSet> Item, const TSharedRef<STableViewBase>& OwnerTable) {
 		return SNew(STextureSetTableRow, OwnerTable)
 			.TextureSets(Item)
-			.ParentTable(SharedThis(this));
+			.ParentTable(SharedThis(this))
+			.ViewModel(ViewModel);
 
 			})
 		.HeaderRow(SetupTexSetHeaderRow())
@@ -1323,21 +1204,18 @@ TSharedPtr<SHeaderRow> SMainTabWidget::SetupHeaderRow()
 
 					// when the checkbox state changes, this lambda function will be called. If the checkbox is checked, all assets will be selected. If the checkbox is unchecked, all assets will be unselected.
 				case ECheckBoxState::Checked:
-					SelectedTextureItems = FilteredTextureListItems;
-					RefreshValidationSummary();
+					ViewModel->SetSelectedTextures(FilteredTextureListItems);
 					break;
 				case ECheckBoxState::Unchecked:
-					SelectedTextureItems.Empty();
-					SelectedTextureSetItems.Empty();
-					RefreshValidationSummary();
+					ViewModel->ClearAllSelections();
 					break;
 				}
 					})
 				.IsChecked_Lambda([this] {
-				if (SelectedTextureItems.Num() == 0) {
+				if (ViewModel->GetSelectedTextures().Num() == 0) {
 					return ECheckBoxState::Unchecked;
 				}
-				else if (SelectedTextureItems.Num() == TextureListItems.Num()) {
+				else if (ViewModel->GetSelectedTextures().Num() == TextureListItems.Num()) {
 					return ECheckBoxState::Checked;
 				}
 				else {
@@ -1376,14 +1254,14 @@ TSharedPtr<SHeaderRow> SMainTabWidget::SetupTexSetHeaderRow()
 
 					// when the checkbox state changes, this lambda function will be called. If the checkbox is checked, all assets will be selected. If the checkbox is unchecked, all assets will be unselected.
 				case ECheckBoxState::Checked:
-					SelectedTextureSetItems = FilteredTextureSetListItems;
+					ViewModel->SetSelectedTextureSets(FilteredTextureSetListItems);
 					for (const TSharedPtr<FMIForgeTextureSet>& TextureSet : FilteredTextureSetListItems)
 					{
 						SelectTexturesInSet(*TextureSet);
 					}
 					break;
 				case ECheckBoxState::Unchecked:
-					SelectedTextureSetItems.Empty();
+					ViewModel->ClearTextureSetSelection();
 					for (const TSharedPtr<FMIForgeTextureSet>& TextureSet : FilteredTextureSetListItems)
 					{
 						UnselectTexturesInSet(*TextureSet);
@@ -1392,10 +1270,10 @@ TSharedPtr<SHeaderRow> SMainTabWidget::SetupTexSetHeaderRow()
 				}
 					})
 				.IsChecked_Lambda([this] {
-				if (SelectedTextureSetItems.Num() == 0) {
+				if (ViewModel->GetSelectedTextureSets().Num() == 0) {
 					return ECheckBoxState::Unchecked;
 				}
-				else if (SelectedTextureSetItems.Num() == TextureSetListItems.Num()) {
+				else if (ViewModel->GetSelectedTextureSets().Num() == TextureSetListItems.Num()) {
 					return ECheckBoxState::Checked;
 				}
 				else {
@@ -1405,7 +1283,7 @@ TSharedPtr<SHeaderRow> SMainTabWidget::SetupTexSetHeaderRow()
 		]
 		+SHeaderRow::Column(FName("Status")) // ID
 		.FillWidth_Lambda([this]() {
-			if (CurrentPresetOption.IsValid() && *CurrentPresetOption == TEXT("Vertex Painting"))
+			if (ViewModel.IsValid() && ViewModel->GetPreset() == EMIForgeGenerationPreset::VertexPainting)
 			{
 				return 0.08f;
 			}
@@ -1448,8 +1326,8 @@ TSharedRef<SWidget> SMainTabWidget::RightContentWidget()
 		+ SHorizontalBox::Slot()
 		.FillWidth(TAttribute<float>::CreateLambda([this]()
 			{
-				if (CurrentPresetOption.IsValid() &&
-					*CurrentPresetOption == TEXT("Vertex Painting"))
+				if (ViewModel.IsValid() &&
+					ViewModel->GetPreset() == EMIForgeGenerationPreset::VertexPainting)
 				{
 					return 0.5f;
 				}
@@ -1468,8 +1346,8 @@ TSharedRef<SWidget> SMainTabWidget::RightContentWidget()
 			SNew(SBorder)
 				.Visibility_Lambda([this]()
 					{
-						return CurrentPresetOption.IsValid() &&
-							*CurrentPresetOption == TEXT("Vertex Painting")
+						return ViewModel.IsValid() &&
+							ViewModel->GetPreset() == EMIForgeGenerationPreset::VertexPainting
 							? EVisibility::Visible
 							: EVisibility::Collapsed;
 					})
@@ -1681,18 +1559,18 @@ TSharedRef<SWidget> SMainTabWidget::ValidationSummaryText()
 					{
 						return FText::Format(
 							FText::FromString(TEXT("Ready to create: {0}/{1} MI(s)")),
-							CurrentValidationSummary.ReadyToCreateCount,
-							CurrentValidationSummary.TotalSets
+							ViewModel->GetValidationSummary().ReadyToCreateCount,
+							ViewModel->GetValidationSummary().TotalSets
 						);
 					})
 				.ColorAndOpacity_Lambda([this]()
 					{
-						if (CurrentValidationSummary.ReadyToCreateCount == 0)
+						if (ViewModel->GetValidationSummary().ReadyToCreateCount == 0)
 							return FSlateColor(FLinearColor::Red);
-						else if (CurrentValidationSummary.ReadyToCreateCount < CurrentValidationSummary.TotalSets)
+						else if (ViewModel->GetValidationSummary().ReadyToCreateCount < ViewModel->GetValidationSummary().TotalSets)
 							return FSlateColor(FLinearColor::Red);
 						else
-							return CurrentValidationSummary.ReadyToCreateCount == CurrentValidationSummary.TotalSets
+							return ViewModel->GetValidationSummary().ReadyToCreateCount == ViewModel->GetValidationSummary().TotalSets
 							? FSlateColor(FLinearColor::Green)
 							: FSlateColor(FLinearColor::Red);
 					})
@@ -1706,12 +1584,12 @@ TSharedRef<SWidget> SMainTabWidget::ValidationSummaryText()
 					{
 						return FText::Format(
 							FText::FromString(TEXT("Missing required textures: {0}")),
-							CurrentValidationSummary.MissingRequiredTextureCount
+							ViewModel->GetValidationSummary().MissingRequiredTextureCount
 						);
 					})
 				.ColorAndOpacity_Lambda([this]()
 					{
-						return CurrentValidationSummary.MissingRequiredTextureCount == 0
+						return ViewModel->GetValidationSummary().MissingRequiredTextureCount == 0
 							? FSlateColor(FLinearColor::Green)
 							: FSlateColor(FLinearColor::Red);
 					})
@@ -1725,12 +1603,12 @@ TSharedRef<SWidget> SMainTabWidget::ValidationSummaryText()
 					{
 						return FText::Format(
 							FText::FromString(TEXT("Missing optional textures: {0}")),
-							CurrentValidationSummary.MissingOptionalTextureCount
+							ViewModel->GetValidationSummary().MissingOptionalTextureCount
 						);
 					})
 				.ColorAndOpacity_Lambda([this]()
 					{
-						return CurrentValidationSummary.MissingOptionalTextureCount == 0
+						return ViewModel->GetValidationSummary().MissingOptionalTextureCount == 0
 							? FSlateColor(FLinearColor::Green)
 							: FSlateColor(FLinearColor(1.f, 0.75f, 0.f, 1.f));
 					})
@@ -1744,12 +1622,12 @@ TSharedRef<SWidget> SMainTabWidget::ValidationSummaryText()
 					{
 						return FText::Format(
 							FText::FromString(TEXT("Unrecognized textures: {0}")),
-							CurrentValidationSummary.UnrecognizedTextureCount
+							ViewModel->GetValidationSummary().UnrecognizedTextureCount
 						);
 					})
 				.ColorAndOpacity_Lambda([this]()
 					{
-						return CurrentValidationSummary.UnrecognizedTextureCount == 0
+						return ViewModel->GetValidationSummary().UnrecognizedTextureCount == 0
 							? FSlateColor(FLinearColor::Green)
 							: FSlateColor(FLinearColor(1.f, 0.75f, 0.f, 1.f));
 					})
@@ -1785,14 +1663,14 @@ TSharedRef<SWidget> SMainTabWidget::VertexPaintValidationSummaryText()
 					{
 						return FText::Format(
 							FText::FromString(TEXT("Ready to generate: {0} \n")),
-							CurrentVertexPaintValidationSummary.bCanGenerate
+							ViewModel->GetVertexPaintValidationSummary().bCanGenerate
 							? FText::FromString(TEXT("Yes"))
 							: FText::FromString(TEXT("No"))
 						);
 					}),
 				TAttribute<FSlateColor>::CreateLambda([this]()
 					{
-						return CurrentVertexPaintValidationSummary.bCanGenerate
+						return ViewModel->GetVertexPaintValidationSummary().bCanGenerate
 							? FSlateColor(FLinearColor(0.f, 1.f, 0.f, 1.0f))
 							: FSlateColor(FLinearColor(1.f, 0.f, 0.f, 1.0f));
 					})
@@ -1807,12 +1685,12 @@ TSharedRef<SWidget> SMainTabWidget::VertexPaintValidationSummaryText()
 					{
 						return FText::Format(
 							FText::FromString(TEXT("Layers Assigned: {0} / 4")),
-							CurrentVertexPaintValidationSummary.AssignedLayerCount
+							ViewModel->GetVertexPaintValidationSummary().AssignedLayerCount
 						);
 					}),
 				TAttribute<FSlateColor>::CreateLambda([this]()
 					{
-						return CurrentVertexPaintValidationSummary.AssignedLayerCount < 2
+						return ViewModel->GetVertexPaintValidationSummary().AssignedLayerCount < 2
 							? FSlateColor(FLinearColor(1.f, 0.f, 0.f, 1.0f))
 							: FSlateColor::UseForeground();
 					})
@@ -1827,12 +1705,12 @@ TSharedRef<SWidget> SMainTabWidget::VertexPaintValidationSummaryText()
 					{
 						return FText::Format(
 							FText::FromString(TEXT("Required Missing: {0}")),
-							CurrentVertexPaintValidationSummary.MissingRequiredTextureCount
+							ViewModel->GetVertexPaintValidationSummary().MissingRequiredTextureCount
 						);
 					}),
 				TAttribute<FSlateColor>::CreateLambda([this]()
 					{
-						return CurrentVertexPaintValidationSummary.MissingRequiredTextureCount > 0
+						return ViewModel->GetVertexPaintValidationSummary().MissingRequiredTextureCount > 0
 							? FSlateColor(FLinearColor(1.f, 0.f, 0.f, 1.0f))
 							: FSlateColor(FLinearColor(0.f, 1.f, 0.f, 1.0f));
 					})
@@ -1847,12 +1725,12 @@ TSharedRef<SWidget> SMainTabWidget::VertexPaintValidationSummaryText()
 					{
 						return FText::Format(
 							FText::FromString(TEXT("Optional Missing: {0}")),
-							CurrentVertexPaintValidationSummary.MissingOptionalTextureCount
+							ViewModel->GetVertexPaintValidationSummary().MissingOptionalTextureCount
 						);
 					}),
 				TAttribute<FSlateColor>::CreateLambda([this]()
 					{
-						return CurrentVertexPaintValidationSummary.MissingOptionalTextureCount > 0
+						return ViewModel->GetVertexPaintValidationSummary().MissingOptionalTextureCount > 0
 							? FSlateColor(FLinearColor(1.0f, 0.75f, 0.0f, 1.0f))
 							: FSlateColor(FLinearColor(0.f, 1.f, 0.f, 1.0f));
 					})
@@ -1867,12 +1745,12 @@ TSharedRef<SWidget> SMainTabWidget::VertexPaintValidationSummaryText()
 					{
 						return FText::Format(
 							FText::FromString(TEXT("Unrecognized Textures: {0} \n")),
-							CurrentVertexPaintValidationSummary.UnrecognizedTextureCount
+							ViewModel->GetVertexPaintValidationSummary().UnrecognizedTextureCount
 						);
 					}),
 				TAttribute<FSlateColor>::CreateLambda([this]()
 					{
-						return CurrentVertexPaintValidationSummary.UnrecognizedTextureCount > 0
+						return ViewModel->GetVertexPaintValidationSummary().UnrecognizedTextureCount > 0
 							? FSlateColor(FLinearColor(1.0f, 0.75f, 0.0f, 1.0f))
 							: FSlateColor(FLinearColor(0.f, 1.f, 0.f, 1.0f));
 					})
@@ -1888,13 +1766,13 @@ TSharedRef<SWidget> SMainTabWidget::VertexPaintValidationSummaryText()
 					{
 						return FText::Format(
 							FText::FromString(TEXT("Base Layer: {0}")),
-							VertexPaintStatusToText(CurrentVertexPaintValidationSummary.BaseStatus)
+							VertexPaintStatusToText(ViewModel->GetVertexPaintValidationSummary().BaseStatus)
 						);
 					}),
 				TAttribute<FSlateColor>::CreateLambda([this]()
 					{
 						return VertexPaintStatusToColor(
-							CurrentVertexPaintValidationSummary.BaseStatus
+							ViewModel->GetVertexPaintValidationSummary().BaseStatus
 						);
 					})
 			)
@@ -1908,13 +1786,13 @@ TSharedRef<SWidget> SMainTabWidget::VertexPaintValidationSummaryText()
 					{
 						return FText::Format(
 							FText::FromString(TEXT("R Layer: {0}")),
-							VertexPaintStatusToText(CurrentVertexPaintValidationSummary.LayerRStatus)
+							VertexPaintStatusToText(ViewModel->GetVertexPaintValidationSummary().LayerRStatus)
 						);
 					}),
 				TAttribute<FSlateColor>::CreateLambda([this]()
 					{
 						return VertexPaintStatusToColor(
-							CurrentVertexPaintValidationSummary.LayerRStatus
+							ViewModel->GetVertexPaintValidationSummary().LayerRStatus
 						);
 					})
 			)
@@ -1928,13 +1806,13 @@ TSharedRef<SWidget> SMainTabWidget::VertexPaintValidationSummaryText()
 					{
 						return FText::Format(
 							FText::FromString(TEXT("G Layer: {0}")),
-							VertexPaintStatusToText(CurrentVertexPaintValidationSummary.LayerGStatus)
+							VertexPaintStatusToText(ViewModel->GetVertexPaintValidationSummary().LayerGStatus)
 						);
 					}),
 				TAttribute<FSlateColor>::CreateLambda([this]()
 					{
 						return VertexPaintStatusToColor(
-							CurrentVertexPaintValidationSummary.LayerGStatus
+							ViewModel->GetVertexPaintValidationSummary().LayerGStatus
 						);
 					})
 			)
@@ -1948,13 +1826,13 @@ TSharedRef<SWidget> SMainTabWidget::VertexPaintValidationSummaryText()
 					{
 						return FText::Format(
 							FText::FromString(TEXT("B Layer: {0}")),
-							VertexPaintStatusToText(CurrentVertexPaintValidationSummary.LayerBStatus)
+							VertexPaintStatusToText(ViewModel->GetVertexPaintValidationSummary().LayerBStatus)
 						);
 					}),
 				TAttribute<FSlateColor>::CreateLambda([this]()
 					{
 						return VertexPaintStatusToColor(
-							CurrentVertexPaintValidationSummary.LayerBStatus
+							ViewModel->GetVertexPaintValidationSummary().LayerBStatus
 						);
 					})
 			)
@@ -1975,8 +1853,7 @@ TSharedRef<SWidget> SMainTabWidget::ValidationSummarySection()
 					SNew(SWidgetSwitcher)
 						.WidgetIndex_Lambda([this]() -> int32 {
 						// Re-evaluates every frame - fully dynamic
-						return (CurrentPresetOption.IsValid() &&
-							*CurrentPresetOption == TEXT("Vertex Painting")) ? 1 : 0;
+						return (ViewModel.IsValid() && ViewModel->GetPreset() == EMIForgeGenerationPreset::VertexPainting) ? 1 : 0;
 							})
 
 						+ SWidgetSwitcher::Slot() // Index 0: Standard + RGB Masking
@@ -1999,7 +1876,7 @@ TSharedRef<SWidget> SMainTabWidget::ValidationSummarySection()
 						.ButtonStyle(FAppStyle::Get(), "FlatButton")
 						.Text(FText::FromString(TEXT("View Details")))
 						.OnClicked_Lambda([this]() {
-						if(CurrentPresetOption.IsValid() && *CurrentPresetOption == TEXT("Standard"))
+						if(ViewModel.IsValid() && ViewModel->GetPreset() == EMIForgeGenerationPreset::Standard)
 						{
 							PopupWindowCreator::OpenPopupWindow(FText::FromString(TEXT("Validation Details")),
 								CreateStandardValidationDetailsWidget(),
@@ -2007,7 +1884,7 @@ TSharedRef<SWidget> SMainTabWidget::ValidationSummarySection()
 								true
 							);
 						}
-						else if (CurrentPresetOption.IsValid() && *CurrentPresetOption == TEXT("RGB Masking"))
+						else if (ViewModel.IsValid() && ViewModel->GetPreset() == EMIForgeGenerationPreset::RGBMask)
 						{
 							PopupWindowCreator::OpenPopupWindow(FText::FromString(TEXT("Validation Details")),
 								CreateRGBmaskingValidationDetailsWidget(),
@@ -2015,7 +1892,7 @@ TSharedRef<SWidget> SMainTabWidget::ValidationSummarySection()
 								true
 							);
 						}
-						else if(CurrentPresetOption.IsValid() && *CurrentPresetOption == TEXT("Vertex Painting"))
+						else if(ViewModel.IsValid() && ViewModel->GetPreset() == EMIForgeGenerationPreset::VertexPainting)
 						{
 							return FReply::Handled();
 						}
@@ -2037,12 +1914,12 @@ void SMainTabWidget::GenerateStandardMIButton(TSharedRef<SVerticalBox> Container
 		[
 			SNew(SButton)
 				.OnClicked_Lambda([this]() {
-				if (CurrentTargetPath.IsEmpty())
+				if (ViewModel->GetTargetPath().IsEmpty())
 				{
 					MIForgeUtilities::PrintWindow((TEXT("Please specify a target path for the generated material instances.")), EAppMsgType::Ok);
 					return FReply::Handled();
 				}
-				if (CurrentValidationSummary.SetsWithErrors > 0)
+				if (ViewModel->GetValidationSummary().SetsWithErrors > 0)
 				{
 					MIForgeUtilities::PrintWindow((TEXT("Please fix all the errors before proceeding. (See 'Validation Summary' or click on 'View Details' for more information)")), EAppMsgType::Ok);
 					return FReply::Handled();
@@ -2050,13 +1927,13 @@ void SMainTabWidget::GenerateStandardMIButton(TSharedRef<SVerticalBox> Container
 
 				FMIForgeMaterialGenerationRequest Request;
 
-				Request.TextureSets = BuildGenerationTextureSets();
+				Request.TextureSets = ViewModel->BuildGenerationTextureSets();
 				Request.Options.Preset = EMIForgeGenerationPreset::Standard;
-				Request.Options.TargetPath = CurrentTargetPath;
-				Request.Options.bUseEmissive = bUseEmissiveTextures;
-				Request.Options.bUseDetailNormal = bUseDetailNormalTextures;
-				Request.Options.bUseTriplanar = bUseTriplanarProjection;
-				Request.Options.IfMIExists = CurrentIfMIExistsOption;
+				Request.Options.TargetPath = ViewModel->GetTargetPath();
+				Request.Options.bUseEmissive = ViewModel->GetUseEmissiveTextures();
+				Request.Options.bUseDetailNormal = ViewModel->GetUseDetailNormalTextures();
+				Request.Options.bUseTriplanar = ViewModel->GetUseTriplanarProjection();
+				Request.Options.IfMIExists = ViewModel->GetIfMIExists();
 
 				
 				const FMIForgeGenerationOutcome Result = FMIForgeGenerationCoordinator().ExecuteMaterialGeneration(Request);
@@ -2078,7 +1955,7 @@ void SMainTabWidget::GenerateStandardMIButton(TSharedRef<SVerticalBox> Container
 
 TSharedRef<SWidget> SMainTabWidget::VertexPaintLayerSlotWidget(EMIForgeVertexPaintLayer Layer)
 {
-	FMIForgeVertexPaintLayerSlot* Slot = GetVertexPaintLayerSlot(Layer);
+	const FMIForgeVertexPaintLayerSlot* Slot = ViewModel->FindVertexPaintLayerSlot(Layer);
 
 	TSharedPtr<SBox>* ThumbnailBoxPtr = nullptr;
 
@@ -2129,17 +2006,10 @@ TSharedRef<SWidget> SMainTabWidget::VertexPaintLayerSlotWidget(EMIForgeVertexPai
 		.OnTextureSetDropped_Lambda(
 			[this, Layer](const TSharedPtr<FMIForgeTextureSet>& DroppedTextureSet, const EMIForgeVertexPaintLayer& DroppedLayer)
 			{
-				FMIForgeVertexPaintLayerSlot* LayerSlot = GetVertexPaintLayerSlot(DroppedLayer);
-
-				if (!LayerSlot || !DroppedTextureSet.IsValid())
+				if (!ViewModel->AssignTextureSetToVertexLayer(DroppedLayer, DroppedTextureSet))
 				{
 					return FReply::Unhandled();
 				}
-
-				LayerSlot->AssignedTextureSet = DroppedTextureSet;
-
-				RefreshVertexPaintLayerThumbnail(DroppedLayer);
-				RefreshValidationSummary();
 
 				return FReply::Handled();
 
@@ -2158,7 +2028,7 @@ TSharedRef<SWidget> SMainTabWidget::VertexPaintLayerSlotWidget(EMIForgeVertexPai
 						SNew(STextBlock)
 							.Font(FCoreStyle::GetDefaultFontStyle("Bold", 10.0f))
 							.Text_Lambda([this, Layer]() {
-							if (FMIForgeVertexPaintLayerSlot* CurrentSlot = GetVertexPaintLayerSlot(Layer))
+							if (const FMIForgeVertexPaintLayerSlot* CurrentSlot = ViewModel->FindVertexPaintLayerSlot(Layer))
 							{
 								return FText::FromString(CurrentSlot->DisplayName);
 							}
@@ -2177,7 +2047,7 @@ TSharedRef<SWidget> SMainTabWidget::VertexPaintLayerSlotWidget(EMIForgeVertexPai
 							SNew(SButton)
 								.Text(FText::FromString(TEXT("X")))
 								.OnClicked_Lambda([this, Layer]() {
-								ClearVertexLayerAssignment(Layer);
+								ViewModel->ClearVertexPaintLayer(Layer);
 								return FReply::Handled();
 									})
 						]
@@ -2213,7 +2083,7 @@ TSharedRef<SWidget> SMainTabWidget::VertexPaintLayerSlotWidget(EMIForgeVertexPai
 								[
 									SNew(STextBlock)
 										.Text_Lambda([this, Layer]() { 
-										if (FMIForgeVertexPaintLayerSlot* CurrentSlot = GetVertexPaintLayerSlot(Layer))
+									if (const FMIForgeVertexPaintLayerSlot* CurrentSlot = ViewModel->FindVertexPaintLayerSlot(Layer))
 										{
 											if (CurrentSlot->AssignedTextureSet.IsValid())
 											{
@@ -2233,9 +2103,10 @@ TSharedRef<SWidget> SMainTabWidget::VertexPaintLayerSlotWidget(EMIForgeVertexPai
 									SNew(STextBlock)
 										.Text_Lambda([this, Layer]()
 											{	
-												if (GetVertexPaintLayerSlot(Layer)->IsAssigned())
+												const FMIForgeVertexPaintLayerSlot* CurrentSlot = ViewModel->FindVertexPaintLayerSlot(Layer);
+												if (CurrentSlot && CurrentSlot->IsAssigned())
 												{
-													return FText::FromString(GetVertexPaintLayerSlot(Layer)->GetAddedTextureTypeText());
+													return FText::FromString(CurrentSlot->GetAddedTextureTypeText());
 												}
 												return GetVertexPaintLayerStatusText(Layer);
 											})
@@ -2250,9 +2121,10 @@ TSharedRef<SWidget> SMainTabWidget::VertexPaintLayerSlotWidget(EMIForgeVertexPai
 									[
 										SNew(STextBlock)
 											.Text_Lambda([this, Layer]()
-												{	if (GetVertexPaintLayerSlot(Layer)->IsAssigned())
+												{	const FMIForgeVertexPaintLayerSlot* CurrentSlot = ViewModel->FindVertexPaintLayerSlot(Layer);
+													if (CurrentSlot && CurrentSlot->IsAssigned())
 													{
-														return FText::FromString(GetVertexPaintLayerSlot(Layer)->GetTextureSizeText());
+														return FText::FromString(CurrentSlot->GetTextureSizeText());
 													}
 													return FText::FromString(TEXT(""));
 												})
@@ -2260,20 +2132,6 @@ TSharedRef<SWidget> SMainTabWidget::VertexPaintLayerSlotWidget(EMIForgeVertexPai
 									]
 						
 						]
-						/*+ SHorizontalBox::Slot()
-							.AutoWidth()
-							.Padding(4.0f, 0.0f)
-							.VAlign(VAlign_Center)
-							[
-								SNew(SButton)
-									.Text(FText::FromString(TEXT("Assign Selected")))
-									.OnClicked_Lambda([this, Layer]() {
-
-										AssignSelectedTextureSetToVertexLayer(Layer);
-										return FReply::Handled();
-									})
-							]*/
-						
 				    ]
 
 		];
@@ -2304,11 +2162,11 @@ void SMainTabWidget::TargetFolderSection(TSharedRef<SVerticalBox> Container)
 					SNew(SEditableTextBox)
 						.Text_Lambda([this]()
 							{
-								return FText::FromString(CurrentTargetPath);
+								return FText::FromString(ViewModel->GetTargetPath());
 							})
 						.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type)
 							{
-								CurrentTargetPath = NewText.ToString();
+								ViewModel->SetTargetPath(NewText.ToString());
 							})
 						.HintText(FText::FromString(TEXT("/Game/Folder/Subfolder")))
 
@@ -2321,7 +2179,7 @@ void SMainTabWidget::TargetFolderSection(TSharedRef<SVerticalBox> Container)
 						.ButtonStyle(&FAppStyle::Get().GetWidgetStyle<FButtonStyle>("SimpleButton"))
 						.OnClicked_Lambda([this]() {
 						MIForgeUtilities::CreatePathSelector(SharedThis(this), FOnPathSelected::CreateLambda([this](const FString& SelectedPath) {
-							CurrentTargetPath = SelectedPath;
+							ViewModel->SetTargetPath(SelectedPath);
 							}));
 						return FReply::Handled();
 							})
@@ -2353,14 +2211,11 @@ void SMainTabWidget::StandardMIOptionSection(TSharedRef<SVerticalBox> Container)
 			SNew(SCheckBox)
 				.OnCheckStateChanged_Lambda([this](ECheckBoxState NewState)
 					{
-						this->bUseEmissiveTextures = (NewState == ECheckBoxState::Checked);
-						TexSetListView->RequestListRefresh();
-						RefreshFilteredTextureSets();
-						RefreshValidationSummary();
+						ViewModel->SetUseEmissiveTextures(NewState == ECheckBoxState::Checked);
 					})
 				.IsChecked_Lambda([this]() -> ECheckBoxState
 					{
-						return this->bUseEmissiveTextures ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+						return ViewModel->GetUseEmissiveTextures() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 					})
 				[
 					SNew(STextBlock)
@@ -2374,14 +2229,11 @@ void SMainTabWidget::StandardMIOptionSection(TSharedRef<SVerticalBox> Container)
 			SNew(SCheckBox)
 				.OnCheckStateChanged_Lambda([this](ECheckBoxState NewState)
 					{
-						this->bUseDetailNormalTextures = (NewState == ECheckBoxState::Checked);
-						TexSetListView->RequestListRefresh();
-						RefreshFilteredTextureSets();
-						RefreshValidationSummary();
+						ViewModel->SetUseDetailNormalTextures(NewState == ECheckBoxState::Checked);
 					})
 				.IsChecked_Lambda([this]() -> ECheckBoxState
 					{
-						return this->bUseDetailNormalTextures ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+						return ViewModel->GetUseDetailNormalTextures() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 					})
 				[
 					SNew(STextBlock)
@@ -2395,11 +2247,11 @@ void SMainTabWidget::StandardMIOptionSection(TSharedRef<SVerticalBox> Container)
 			SNew(SCheckBox)
 				.OnCheckStateChanged_Lambda([this](ECheckBoxState NewState)
 					{
-						this->bUseTriplanarProjection = (NewState == ECheckBoxState::Checked);
+						ViewModel->SetUseTriplanarProjection(NewState == ECheckBoxState::Checked);
 					})
 				.IsChecked_Lambda([this]() -> ECheckBoxState
 					{
-						return this->bUseTriplanarProjection ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+						return ViewModel->GetUseTriplanarProjection() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 					})
 				[
 					SNew(STextBlock)
@@ -2425,14 +2277,11 @@ void SMainTabWidget::RGBmaskingMIOptionSection(TSharedRef<SVerticalBox> Containe
 			SNew(SCheckBox)
 				.OnCheckStateChanged_Lambda([this](ECheckBoxState NewState)
 					{
-						this->bUseBaseORMTexture = (NewState == ECheckBoxState::Checked);
-						TexSetListView->RequestListRefresh();
-						RefreshFilteredTextureSets();
-						RefreshValidationSummary();
+						ViewModel->SetUseBaseORMTexture(NewState == ECheckBoxState::Checked);
 					})
 				.IsChecked_Lambda([this]() -> ECheckBoxState
 					{
-						return this->bUseBaseORMTexture ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+						return ViewModel->GetUseBaseORMTexture() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 					})
 				[
 					SNew(STextBlock)
@@ -2446,14 +2295,11 @@ void SMainTabWidget::RGBmaskingMIOptionSection(TSharedRef<SVerticalBox> Containe
 			SNew(SCheckBox)
 				.OnCheckStateChanged_Lambda([this](ECheckBoxState NewState)
 					{
-						this->bEnableEmissiveChannel = (NewState == ECheckBoxState::Checked);
-						TexSetListView->RequestListRefresh();
-						RefreshFilteredTextureSets();
-						RefreshValidationSummary();
+						ViewModel->SetEnableEmissiveChannel(NewState == ECheckBoxState::Checked);
 					})
 				.IsChecked_Lambda([this]() -> ECheckBoxState
 					{
-						return this->bEnableEmissiveChannel ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+						return ViewModel->GetEnableEmissiveChannel() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 					})
 				[
 					SNew(STextBlock)
@@ -2467,14 +2313,11 @@ void SMainTabWidget::RGBmaskingMIOptionSection(TSharedRef<SVerticalBox> Containe
 			SNew(SCheckBox)
 				.OnCheckStateChanged_Lambda([this](ECheckBoxState NewState)
 					{
-						this->bUseDetailNormalTextureRGB = (NewState == ECheckBoxState::Checked);
-						TexSetListView->RequestListRefresh();
-						RefreshFilteredTextureSets();
-						RefreshValidationSummary();
+						ViewModel->SetUseDetailNormalTextureRGB(NewState == ECheckBoxState::Checked);
 					})
 				.IsChecked_Lambda([this]() -> ECheckBoxState
 					{
-						return this->bUseDetailNormalTextureRGB ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+						return ViewModel->GetUseDetailNormalTextureRGB() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 					})
 				[
 					SNew(STextBlock)
@@ -2493,12 +2336,12 @@ void SMainTabWidget::GenerateRGBmaskingMIButton(TSharedRef<SVerticalBox> Contain
 		[
 			SNew(SButton)
 				.OnClicked_Lambda([this]() {
-				if (CurrentTargetPath.IsEmpty())
+				if (ViewModel->GetTargetPath().IsEmpty())
 				{
 					MIForgeUtilities::PrintWindow((TEXT("Please specify a target path for the generated material instances.")), EAppMsgType::Ok);
 					return FReply::Handled();
 				}
-				if (CurrentValidationSummary.SetsWithErrors > 0)
+				if (ViewModel->GetValidationSummary().SetsWithErrors > 0)
 				{
 					MIForgeUtilities::PrintWindow((TEXT("Please fix all the errors before proceeding. (See 'Validation Summary' or click on 'View Details' for more information)")), EAppMsgType::Ok);
 					return FReply::Handled();
@@ -2506,14 +2349,13 @@ void SMainTabWidget::GenerateRGBmaskingMIButton(TSharedRef<SVerticalBox> Contain
 
 				FMIForgeMaterialGenerationRequest Request;
 
-				Request.TextureSets = BuildGenerationTextureSets();
+				Request.TextureSets = ViewModel->BuildGenerationTextureSets();
 				Request.Options.Preset = EMIForgeGenerationPreset::RGBMask;
-				Request.Options.TargetPath = CurrentTargetPath;
-				Request.Options.bUseBaseORMTexture = bUseBaseORMTexture;
-				Request.Options.bEnableEmissiveChannel = bEnableEmissiveChannel;
-				Request.Options.bUseDetailNormalTextureRGB =
-					bUseDetailNormalTextureRGB;
-				Request.Options.IfMIExists = CurrentIfMIExistsOption;
+				Request.Options.TargetPath = ViewModel->GetTargetPath();
+				Request.Options.bUseBaseORMTexture = ViewModel->GetUseBaseORMTexture();
+				Request.Options.bEnableEmissiveChannel = ViewModel->GetEnableEmissiveChannel();
+				Request.Options.bUseDetailNormalTextureRGB = ViewModel->GetUseDetailNormalTextureRGB();
+				Request.Options.IfMIExists = ViewModel->GetIfMIExists();
 
 				const FMIForgeGenerationOutcome Outcome =
 					FMIForgeGenerationCoordinator()
@@ -2544,14 +2386,14 @@ void SMainTabWidget::GenerateVertexPaintMIButton(TSharedRef<SVerticalBox> Contai
 			SNew(SButton)
 				.ButtonStyle(FAppStyle::Get(), "SecondaryButton")
 				.OnClicked_Lambda([this]() {
-				if (CurrentTargetPath.IsEmpty())
+				if (ViewModel->GetTargetPath().IsEmpty())
 				{
 					MIForgeUtilities::PrintWindow((TEXT("Please specify a target path for the generated material instances.")), EAppMsgType::Ok);
 					return FReply::Handled();
 				}
 
-				RefreshValidationSummary();
-				if (!CurrentVertexPaintValidationSummary.bCanGenerate)
+				ViewModel->RefreshValidation();
+				if (!ViewModel->GetVertexPaintValidationSummary().bCanGenerate)
 				{
 					MIForgeUtilities::PrintWindow(
 						TEXT("Please fix all Vertex Paint layer errors before proceeding."),
@@ -2561,9 +2403,9 @@ void SMainTabWidget::GenerateVertexPaintMIButton(TSharedRef<SVerticalBox> Contai
 				}
 
 				FMIForgeVertexPaintGenerationRequest Request;
-				Request.LayerStack = VertexPaintLayerStack;
-				Request.Options.TargetPath = CurrentTargetPath;
-				Request.Options.IfMIExists = CurrentIfMIExistsOption;
+				Request.LayerStack = ViewModel->GetVertexPaintLayerStack();
+				Request.Options.TargetPath = ViewModel->GetTargetPath();
+				Request.Options.IfMIExists = ViewModel->GetIfMIExists();
 				
 
 				const FString RequestedMIName =
@@ -2646,7 +2488,7 @@ void SMainTabWidget::VertexPaintRecipeSection(TSharedRef<SVerticalBox> Container
 
 								VertexPaintRecipeManager.SaveRecipe(
 									RecipeName,
-									VertexPaintLayerStack
+									ViewModel->GetVertexPaintLayerStack()
 								);
 
 								CurrentVertexPaintRecipeOption =
@@ -2677,12 +2519,10 @@ void SMainTabWidget::VertexPaintRecipeSection(TSharedRef<SVerticalBox> Container
 							CurrentVertexPaintRecipeOption = Option;
 							CurrentVertexPaintRecipeOptionText->SetText(FText::FromString(*Option));
 
-							if (VertexPaintRecipeManager.LoadRecipe(*Option, VertexPaintLayerStack))
+							FMIForgeVertexPaintLayerStack LoadedStack = ViewModel->GetVertexPaintLayerStack();
+							if (VertexPaintRecipeManager.LoadRecipe(*Option, LoadedStack))
 							{
-								RefreshVertexPaintLayerThumbnail(EMIForgeVertexPaintLayer::LayerR);
-								RefreshVertexPaintLayerThumbnail(EMIForgeVertexPaintLayer::LayerG);
-								RefreshVertexPaintLayerThumbnail(EMIForgeVertexPaintLayer::LayerB);
-								RefreshValidationSummary();
+								ViewModel->SetVertexPaintLayerStack(LoadedStack);
 							}
 						}
 
@@ -2834,50 +2674,12 @@ void SMainTabWidget::VertexPaintingMIOptionSection(TSharedRef<SVerticalBox> Cont
 							SNew(SButton)
 								.Text(FText::FromString(TEXT("Assign Selected")))
 								.OnClicked_Lambda([this]() {
-
-								if (SelectedTextureSetItems.Num() == 0)
+								FText Error;
+								if (!ViewModel->AssignSelectedTextureSetsToVertexLayers(Error))
 								{
-									MIForgeUtilities::PrintNotification(
-										TEXT("Please select at least one texture set to assign.")
-									);
+									MIForgeUtilities::PrintNotification(Error.ToString());
 									return FReply::Unhandled();
 								}
-
-								if (SelectedTextureSetItems.Num() > 4)
-								{
-									MIForgeUtilities::PrintNotification(
-										TEXT("Please select no more than 4 texture sets to assign.")
-									);
-									return FReply::Unhandled();
-								}
-
-								VertexPaintLayerStack.BaseLayer.AssignedTextureSet.Reset();
-								VertexPaintLayerStack.LayerR.AssignedTextureSet.Reset();
-								VertexPaintLayerStack.LayerG.AssignedTextureSet.Reset();
-								VertexPaintLayerStack.LayerB.AssignedTextureSet.Reset();
-
-								VertexPaintLayerStack.BaseLayer.AssignedTextureSet = SelectedTextureSetItems[0];
-
-								if (SelectedTextureSetItems.Num() >= 2)
-								{
-									VertexPaintLayerStack.LayerR.AssignedTextureSet = SelectedTextureSetItems[1];
-								}
-
-								if (SelectedTextureSetItems.Num() >= 3)
-								{
-									VertexPaintLayerStack.LayerG.AssignedTextureSet = SelectedTextureSetItems[2];
-								}
-
-								if (SelectedTextureSetItems.Num() >= 4)
-								{
-									VertexPaintLayerStack.LayerB.AssignedTextureSet = SelectedTextureSetItems[3];
-								}
-
-								RefreshValidationSummary();
-								RefreshVertexPaintLayerThumbnail(VertexPaintLayerStack.BaseLayer.Layer);
-								RefreshVertexPaintLayerThumbnail(VertexPaintLayerStack.LayerR.Layer);
-								RefreshVertexPaintLayerThumbnail(VertexPaintLayerStack.LayerG.Layer);
-								RefreshVertexPaintLayerThumbnail(VertexPaintLayerStack.LayerB.Layer);
 
 								return FReply::Handled();
 									})
@@ -2890,17 +2692,7 @@ void SMainTabWidget::VertexPaintingMIOptionSection(TSharedRef<SVerticalBox> Cont
 							SNew(SButton)
 								.Text(FText::FromString(TEXT("Clear All")))
 								.OnClicked_Lambda([this]() {
-
-								VertexPaintLayerStack.BaseLayer.AssignedTextureSet.Reset();
-								VertexPaintLayerStack.LayerR.AssignedTextureSet.Reset();
-								VertexPaintLayerStack.LayerG.AssignedTextureSet.Reset();
-								VertexPaintLayerStack.LayerB.AssignedTextureSet.Reset();
-
-								RefreshValidationSummary();
-								RefreshVertexPaintLayerThumbnail(VertexPaintLayerStack.BaseLayer.Layer);
-								RefreshVertexPaintLayerThumbnail(VertexPaintLayerStack.LayerR.Layer);
-								RefreshVertexPaintLayerThumbnail(VertexPaintLayerStack.LayerG.Layer);
-								RefreshVertexPaintLayerThumbnail(VertexPaintLayerStack.LayerB.Layer);
+								ViewModel->ClearAllVertexPaintLayers();
 
 								return FReply::Handled();
 									})
@@ -2991,12 +2783,12 @@ TSharedRef<SWidget> SMainTabWidget::IfMIExistsOptionBlock()
 					{
 						if (NewState == ECheckBoxState::Checked)
 						{
-							this->CurrentIfMIExistsOption = EIfMIExistsOption::Skip;
+							ViewModel->SetIfMIExists(EIfMIExistsOption::Skip);
 						}
 					})
 				.IsChecked_Lambda([this]() -> ECheckBoxState
 					{
-						return (this->CurrentIfMIExistsOption == EIfMIExistsOption::Skip) ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+						return (ViewModel->GetIfMIExists() == EIfMIExistsOption::Skip) ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 					})
 				[
 					SNew(STextBlock).Text(FText::FromString(TEXT("Skip")))
@@ -3012,12 +2804,12 @@ TSharedRef<SWidget> SMainTabWidget::IfMIExistsOptionBlock()
 					{
 						if (NewState == ECheckBoxState::Checked)
 						{
-							this->CurrentIfMIExistsOption = EIfMIExistsOption::Overwrite;
+							ViewModel->SetIfMIExists(EIfMIExistsOption::Overwrite);
 						}
 					})
 				.IsChecked_Lambda([this]() -> ECheckBoxState
 					{
-						return (this->CurrentIfMIExistsOption == EIfMIExistsOption::Overwrite) ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+						return (ViewModel->GetIfMIExists() == EIfMIExistsOption::Overwrite) ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 					})
 				[
 					SNew(STextBlock).Text(FText::FromString(TEXT("Overwrite")))
@@ -3033,12 +2825,12 @@ TSharedRef<SWidget> SMainTabWidget::IfMIExistsOptionBlock()
 					{
 						if (NewState == ECheckBoxState::Checked)
 						{
-							this->CurrentIfMIExistsOption = EIfMIExistsOption::CreateUnique;
+							ViewModel->SetIfMIExists(EIfMIExistsOption::CreateUnique);
 						}
 					})
 				.IsChecked_Lambda([this]() -> ECheckBoxState
 					{
-						return (this->CurrentIfMIExistsOption == EIfMIExistsOption::CreateUnique) ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+						return (ViewModel->GetIfMIExists() == EIfMIExistsOption::CreateUnique) ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 					})
 				[
 					SNew(STextBlock).Text(FText::FromString(TEXT("Create Unique Name")))
@@ -3062,12 +2854,12 @@ TArray<TSharedPtr<FMIForgeTextureInfo>> SMainTabWidget::ResolveTexturesForSet(co
 	AddTextureIfPresent(EMIForgeTextureType::Normal);
 	AddTextureIfPresent(EMIForgeTextureType::ORM);
 
-	if (bUseEmissiveTextures)
+	if (ViewModel->GetUseEmissiveTextures())
 	{
 		AddTextureIfPresent(EMIForgeTextureType::Emissive);
 	}
 
-	if (bUseDetailNormalTextures)
+	if (ViewModel->GetUseDetailNormalTextures())
 	{
 		AddTextureIfPresent(EMIForgeTextureType::DetailNormal);
 	}
@@ -3079,11 +2871,11 @@ FText SMainTabWidget::GetValidationSummaryText() const
 {
 	return FText::Format(
 		FText::FromString(TEXT("Validation Summary: \n\nReady to create: {0}/{1} MI(s)\nMissing required textures: {2}\nMissing optional textures: {3}\nUnrecognized textures: {4}")),
-		CurrentValidationSummary.ReadyToCreateCount,
-		CurrentValidationSummary.TotalSets,
-		CurrentValidationSummary.MissingRequiredTextureCount,
-		CurrentValidationSummary.MissingOptionalTextureCount,
-		CurrentValidationSummary.UnrecognizedTextureCount
+		ViewModel->GetValidationSummary().ReadyToCreateCount,
+		ViewModel->GetValidationSummary().TotalSets,
+		ViewModel->GetValidationSummary().MissingRequiredTextureCount,
+		ViewModel->GetValidationSummary().MissingOptionalTextureCount,
+		ViewModel->GetValidationSummary().UnrecognizedTextureCount
 	);
 }
 
@@ -3091,81 +2883,15 @@ FText SMainTabWidget::GetMIReadyCount() const
 {
 	return FText::Format(
 		FText::FromString(TEXT("Generate Instances ({0})")),
-		CurrentValidationSummary.ReadyToCreateCount
+		ViewModel->GetValidationSummary().ReadyToCreateCount
 	);
-}
-
-
-
-void SMainTabWidget::RefreshValidationSummary()
-{
-	FMIForgeValidator Validator;
-
-	if (!CurrentPresetOption.IsValid())
-	{
-		CurrentValidationSummary = FMIForgeValidationSummary();
-		return;
-	}
-
-	if (*CurrentPresetOption == TEXT("Standard"))
-	{
-		if (CurrentInputMode == EMIForgeInputMode::TextureSets)
-		{
-			CurrentValidationSummary = Validator.BuildStandardSummaryFromTextureSets(
-				BuildGenerationTextureSets(),
-				bUseEmissiveTextures,
-				bUseDetailNormalTextures,
-				bIgnoreUnrecognizedTextures
-			);
-		}
-		else
-		{
-			CurrentValidationSummary = Validator.BuildStandardSummaryFromTextures(
-				SelectedTextureItems,
-				bUseEmissiveTextures,
-				bUseDetailNormalTextures,
-				bIgnoreUnrecognizedTextures
-			);
-		}
-	}
-	else if (*CurrentPresetOption == TEXT("RGB Masking"))
-	{
-		if (CurrentInputMode == EMIForgeInputMode::TextureSets)
-		{
-			CurrentValidationSummary = Validator.BuildRGBSummaryFromTextureSets(
-				BuildGenerationTextureSets(),
-				bUseBaseORMTexture,
-				bEnableEmissiveChannel,
-				bUseDetailNormalTextureRGB,
-				bIgnoreUnrecognizedTextures
-			);
-		}
-		else
-		{
-			CurrentValidationSummary = Validator.BuildRGBSummaryFromTextures(
-				SelectedTextureItems,
-				bUseBaseORMTexture,
-				bEnableEmissiveChannel,
-				bUseDetailNormalTextureRGB,
-				bIgnoreUnrecognizedTextures
-			);
-		}
-
-	}
-	else if (*CurrentPresetOption == TEXT("Vertex Painting"))
-	{
-		
-		CurrentVertexPaintValidationResult = Validator.ValidateVertexPaintLayerStack(VertexPaintLayerStack, bIgnoreUnrecognizedTextures);
-
-		CurrentVertexPaintValidationSummary = Validator.BuildVertexPaintLayerStackSummary(CurrentVertexPaintValidationResult);
-	}
 }
 
 TSharedRef<SWidget> SMainTabWidget::CreateStandardValidationDetailsWidget()
 {
 	TSharedRef<SScrollBox> ScrollBox = SNew(SScrollBox);
 
-	 if(CurrentValidationSummary.SetResults.Num() == 0)
+	 if(ViewModel->GetValidationSummary().SetResults.Num() == 0)
 	{
 		ScrollBox->AddSlot()
 			.Padding(4.f)
@@ -3240,7 +2966,7 @@ TSharedRef<SWidget> SMainTabWidget::CreateStandardValidationDetailsWidget()
 		 };
 
 	 for (const FMIForgeTextureSetValidationResult& SetResult :
-		 CurrentValidationSummary.SetResults)
+		 ViewModel->GetValidationSummary().SetResults)
 	 {
 		 TSharedRef<SGridPanel> Grid = SNew(SGridPanel);
 
@@ -3364,7 +3090,7 @@ TSharedRef<SWidget> SMainTabWidget::CreateRGBmaskingValidationDetailsWidget()
 {
 	TSharedRef<SScrollBox> ScrollBox = SNew(SScrollBox);
 
-	if (CurrentValidationSummary.SetResults.Num() == 0)
+	if (ViewModel->GetValidationSummary().SetResults.Num() == 0)
 	{
 		ScrollBox->AddSlot()
 			.Padding(4.f)
@@ -3441,7 +3167,7 @@ TSharedRef<SWidget> SMainTabWidget::CreateRGBmaskingValidationDetailsWidget()
 		};
 
 	for (const FMIForgeTextureSetValidationResult& SetResult :
-		CurrentValidationSummary.SetResults)
+		ViewModel->GetValidationSummary().SetResults)
 	{
 		TSharedRef<SGridPanel> Grid = SNew(SGridPanel);
 
@@ -3593,64 +3319,10 @@ TSharedRef<SWidget> SMainTabWidget::CreateVertexPaintLayerThumbnailWidget(EMIFor
 		];
 }
 
-void SMainTabWidget::AssignSelectedTextureSetToVertexLayer(EMIForgeVertexPaintLayer Layer)
-{	
-	if (SelectedTextureSetItems.Num() == 0)
-	{
-		MIForgeUtilities::PrintNotification(
-			TEXT("Please select any texture set to assign.")
-		);
-		return;
-	}
-
-	FMIForgeVertexPaintLayerSlot* Slot = GetVertexPaintLayerSlot(Layer);
-	
-	if (!Slot)
-	{
-		return;
-	}
-
-	Slot->AssignedTextureSet = SelectedTextureSetItems.Last();
-
-	RefreshValidationSummary();
-	RefreshVertexPaintLayerThumbnail(Layer);
-}
-
-void SMainTabWidget::ClearVertexLayerAssignment(EMIForgeVertexPaintLayer Layer)
-{
-	FMIForgeVertexPaintLayerSlot* Slot = GetVertexPaintLayerSlot(Layer);
-
-	if (!Slot)
-	{
-		return;
-	}
-
-	Slot->AssignedTextureSet.Reset();
-
-	RefreshValidationSummary();
-	RefreshVertexPaintLayerThumbnail(Layer);
-}
-
-FMIForgeVertexPaintLayerSlot* SMainTabWidget::GetVertexPaintLayerSlot(EMIForgeVertexPaintLayer Layer)
-{	
-	switch (Layer)
-	{
-		case EMIForgeVertexPaintLayer::Base:
-			return &VertexPaintLayerStack.BaseLayer;
-		case EMIForgeVertexPaintLayer::LayerR:
-			return &VertexPaintLayerStack.LayerR;
-		case EMIForgeVertexPaintLayer::LayerG:
-			return &VertexPaintLayerStack.LayerG;
-		case EMIForgeVertexPaintLayer::LayerB:
-			return &VertexPaintLayerStack.LayerB;
-	}
-	return nullptr;
-}
-
 FText SMainTabWidget::GetVertexPaintLayerStatusText(EMIForgeVertexPaintLayer Layer) const
 {
 	for (const FMIForgeVertexPaintLayerValidationResult& Result :
-		CurrentVertexPaintValidationResult.LayerResults)
+		ViewModel->GetVertexPaintValidationResult().LayerResults)
 	{
 		if (Result.Layer == Layer)
 		{
@@ -3682,7 +3354,7 @@ FText SMainTabWidget::GetVertexPaintValidationSummaryText() const
 
 	SummaryText += FString::Printf(
 		TEXT("Ready to create: %s\n\n"),
-		CurrentVertexPaintValidationSummary.bCanGenerate ? TEXT("Yes") : TEXT("No")
+		ViewModel->GetVertexPaintValidationSummary().bCanGenerate ? TEXT("Yes") : TEXT("No")
 	);
 
 	auto StatusToString = [](EMIForgeVertexPaintLayerStatus Status) -> FString
@@ -3706,7 +3378,7 @@ FText SMainTabWidget::GetVertexPaintValidationSummaryText() const
 		};
 
 	for (const FMIForgeVertexPaintLayerValidationResult& LayerResult :
-		CurrentVertexPaintValidationSummary.LayerResults)
+		ViewModel->GetVertexPaintValidationSummary().LayerResults)
 	{
 		SummaryText += FString::Printf(
 			TEXT("%s: %s"),
@@ -3747,7 +3419,7 @@ FText SMainTabWidget::GetVertexPaintValidationSummaryText() const
 FSlateColor SMainTabWidget::GetVertexPaintLayerStatusColor(EMIForgeVertexPaintLayer Layer) const
 {
 	for (const FMIForgeVertexPaintLayerValidationResult& Result :
-		CurrentVertexPaintValidationResult.LayerResults)
+		ViewModel->GetVertexPaintValidationResult().LayerResults)
 	{
 		if (Result.Layer == Layer)
 		{
@@ -3808,26 +3480,8 @@ void SMainTabWidget::RefreshVertexPaintLayerThumbnail(EMIForgeVertexPaintLayer L
 
 const FAssetData* SMainTabWidget::GetVertexPaintLayerThumbnailAsset(EMIForgeVertexPaintLayer Layer) const
 {
-	const FMIForgeVertexPaintLayerSlot* Slot = nullptr;
-
-	switch (Layer)
-	{
-	case EMIForgeVertexPaintLayer::Base:
-		Slot = &VertexPaintLayerStack.BaseLayer;
-		break;
-
-	case EMIForgeVertexPaintLayer::LayerR:
-		Slot = &VertexPaintLayerStack.LayerR;
-		break;
-
-	case EMIForgeVertexPaintLayer::LayerG:
-		Slot = &VertexPaintLayerStack.LayerG;
-		break;
-
-	case EMIForgeVertexPaintLayer::LayerB:
-		Slot = &VertexPaintLayerStack.LayerB;
-		break;
-	}
+	const FMIForgeVertexPaintLayerSlot* Slot =
+		ViewModel->FindVertexPaintLayerSlot(Layer);
 
 	if (!Slot || !Slot->AssignedTextureSet.IsValid())
 	{
@@ -3845,38 +3499,80 @@ const FAssetData* SMainTabWidget::GetVertexPaintLayerThumbnailAsset(EMIForgeVert
 	return &Albedo->AssetData;
 }
 
-TArray<TSharedPtr<FMIForgeTextureSet>> SMainTabWidget::BuildGenerationTextureSets() const
+void SMainTabWidget::HandlePresetChanged(EMIForgeGenerationPreset NewPreset)
 {
-	if (CurrentInputMode == EMIForgeInputMode::TextureSets)
+	switch (NewPreset)
 	{
-		return SelectedTextureSetItems;
-	}
+	case EMIForgeGenerationPreset::Standard:
+		PresetPannelSwitcher0->SetActiveWidgetIndex(0);
+		break;
 
-	TArray<FMIForgeTextureInfo> RawSelectedTextures;
-	RawSelectedTextures.Reserve(SelectedTextureItems.Num());
+	case EMIForgeGenerationPreset::RGBMask:
+		PresetPannelSwitcher0->SetActiveWidgetIndex(1);
+		break;
 
-	for (const TSharedPtr<FMIForgeTextureInfo>& Texture :
-		SelectedTextureItems)
-	{
-		if (Texture.IsValid())
+	case EMIForgeGenerationPreset::VertexPainting:
+		PresetPannelSwitcher0->SetActiveWidgetIndex(2);
+
+		ViewModel->SetInputMode(EMIForgeInputMode::TextureSets);
+
+		if (ViewModeSwitcher0.IsValid())
 		{
-			RawSelectedTextures.Add(*Texture);
+			ViewModeSwitcher0->SetActiveWidgetIndex(1);
 		}
+
+		ActiveFilterOptions =
+			TextureSetFilterOptions;
+
+		CurrentFilterOption =
+			CurrentTextureSetFilterOption;
+
+		if (FilterComboBox.IsValid())
+		{
+			FilterComboBox->RefreshOptions();
+		}
+
+		break;
 	}
 
-	FMIForgeTextureSetBuilder SetBuilder;
-	TArray<FMIForgeTextureSet> BuiltSets =
-		SetBuilder.BuildTextureSets(RawSelectedTextures);
+	RefreshFilteredTextureSets();
 
-	TArray<TSharedPtr<FMIForgeTextureSet>> Result;
-	Result.Reserve(BuiltSets.Num());
-
-	for (FMIForgeTextureSet& Set : BuiltSets)
+	if (TexSetListView.IsValid())
 	{
-		Result.Add(MakeShared<FMIForgeTextureSet>(MoveTemp(Set)));
+		TexSetListView->RequestListRefresh();
 	}
 
-	return Result;
+}
+
+void SMainTabWidget::HandleGenerationOptionsChanged()
+{
+	RefreshFilteredTextureSets();
+
+	if (TexSetListView.IsValid())
+	{
+		TexSetListView->RequestListRefresh();
+	}
+
+}
+
+void SMainTabWidget::HandleSelectionChanged()
+{
+	if (TexListView.IsValid())
+	{
+		TexListView->RequestListRefresh();
+	}
+	if (TexSetListView.IsValid())
+	{
+		TexSetListView->RequestListRefresh();
+	}
+}
+
+void SMainTabWidget::HandleVertexPaintChanged()
+{
+	RefreshVertexPaintLayerThumbnail(EMIForgeVertexPaintLayer::Base);
+	RefreshVertexPaintLayerThumbnail(EMIForgeVertexPaintLayer::LayerR);
+	RefreshVertexPaintLayerThumbnail(EMIForgeVertexPaintLayer::LayerG);
+	RefreshVertexPaintLayerThumbnail(EMIForgeVertexPaintLayer::LayerB);
 }
 
 

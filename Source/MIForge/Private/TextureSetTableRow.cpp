@@ -10,10 +10,13 @@
 #include "MIForgeUtilities.h"
 #include "MIForgeTexSetDragDropOperation.h"
 
+#include "UIs/MIForgeMainTabViewModel.h"
+
 void STextureSetTableRow::Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& OwnerTableView)
 {
 	TextureSets = InArgs._TextureSets;
 	ParentTable = InArgs._ParentTable;
+	ViewModel = InArgs._ViewModel;
 	SMultiColumnTableRow::Construct(FSuperRowType::FArguments(), OwnerTableView);
 }
 
@@ -26,15 +29,15 @@ TSharedRef<SWidget> STextureSetTableRow::GenerateWidgetForColumn(const FName& Co
 			.OnCheckStateChanged_Lambda([this](ECheckBoxState CheckState) {
 				switch (CheckState) {
 				case ECheckBoxState::Checked:
-					if (TextureSets.IsValid())
+					if (TextureSets.IsValid() && ViewModel.IsValid())
 					{
-						ParentTable->SelectTextureSet(TextureSets);
+						ViewModel->SelectTextureSet(TextureSets);
 						ParentTable->SelectTexturesInSet(*TextureSets);
 					}
 					break;
 				case ECheckBoxState::Unchecked:
-					if (TextureSets.IsValid()) {
-						ParentTable->UnselectTextureSet(TextureSets);
+					if (TextureSets.IsValid() && ViewModel.IsValid()) {
+						ViewModel->UnselectTextureSet(TextureSets);
 						ParentTable->UnselectTexturesInSet(*TextureSets);
 					}
 
@@ -43,7 +46,9 @@ TSharedRef<SWidget> STextureSetTableRow::GenerateWidgetForColumn(const FName& Co
 
 				})
 			.IsChecked_Lambda([this]() -> ECheckBoxState {
-				return ParentTable->IsTextureSetSelected(TextureSets) ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+				return ViewModel.IsValid() && ViewModel->IsTextureSetSelected(TextureSets)
+					? ECheckBoxState::Checked
+					: ECheckBoxState::Unchecked;
 				})
 
 				);
@@ -58,39 +63,39 @@ TSharedRef<SWidget> STextureSetTableRow::GenerateWidgetForColumn(const FName& Co
 				SNew(SImage)
 					.Image_Lambda([this]() -> const FSlateBrush*
 						{
-							if (!TextureSets.IsValid() || !ParentTable.IsValid())
+							if (!TextureSets.IsValid())
 							{
 								return nullptr;
 							}
 
-							if (!ParentTable->CurrentPresetOption.IsValid())
+							if (!ViewModel.IsValid())
 							{
 								return nullptr;
 							}
 
 							FMIForgeValidator::EMIForgeTextureSetStatus StatusResult;
 
-							const FString& PresetName = *ParentTable->CurrentPresetOption;
+							const EMIForgeGenerationPreset Preset = ViewModel->GetPreset();
 
-							if (PresetName == TEXT("Standard"))
+							if (Preset == EMIForgeGenerationPreset::Standard)
 							{
 								StatusResult =
 									FMIForgeValidator().GetStandardSetStatus(
 										*TextureSets,
-										ParentTable->bUseEmissiveTextures,
-										ParentTable->bUseDetailNormalTextures,
-										ParentTable->bIgnoreUnrecognizedTextures
+										ViewModel->GetUseEmissiveTextures(),
+										ViewModel->GetUseDetailNormalTextures(),
+										ViewModel->GetIgnoreUnrecognizedTextures()
 									);
 							}
-							else if (PresetName == TEXT("RGB Masking"))
+							else if (Preset == EMIForgeGenerationPreset::RGBMask)
 							{
 								StatusResult =
 									FMIForgeValidator().GetRGBSetStatus(
 										*TextureSets,
-										ParentTable->bUseBaseORMTexture,
-										ParentTable->bEnableEmissiveChannel,
-										ParentTable->bUseDetailNormalTextureRGB,
-										ParentTable->bIgnoreUnrecognizedTextures
+										ViewModel->GetUseBaseORMTexture(),
+										ViewModel->GetEnableEmissiveChannel(),
+										ViewModel->GetUseDetailNormalTextureRGB(),
+										ViewModel->GetIgnoreUnrecognizedTextures()
 									);
 							}
 							else
@@ -98,7 +103,7 @@ TSharedRef<SWidget> STextureSetTableRow::GenerateWidgetForColumn(const FName& Co
 								StatusResult =
 									FMIForgeValidator().GetVertexPaintSetStatus(
 										*TextureSets,
-										ParentTable->bIgnoreUnrecognizedTextures
+										ViewModel->GetIgnoreUnrecognizedTextures()
 									);
 							}
 
