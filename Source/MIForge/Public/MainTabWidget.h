@@ -7,6 +7,7 @@
 #include "MIForgeVertexPaintRecipeManager.h"
 
 class FMIForgeMainTabViewModel;
+class FMIForgeTextureCatalog;
 
 class SMainTabWidget : public SCompoundWidget
 {
@@ -18,40 +19,15 @@ public:
 
 	void Construct(const FArguments& InArgs);
 
-	void BindActionsToOnAssetsChanged();
-	void UnbindActionsToOnAssetsChanged();
-
 	~SMainTabWidget();
-
-	void SelectTexturesInSet(const FMIForgeTextureSet& TextureSet);
-	void UnselectTexturesInSet(const FMIForgeTextureSet& TextureSet);
 
 	void RefreshVertexPaintLayerThumbnail(EMIForgeVertexPaintLayer Layer);
 
 
 private:
-	FDelegateHandle AddAssetHandle;
-	FDelegateHandle RemoveAssetHandle;
-
-	bool bRefreshQueued = false;
-	FTSTicker::FDelegateHandle RefreshTickerHandle;
-	void QueueListRefresh();
-
-	void RefreshFilteredTextures();
-	void RefreshFilteredTextureSets();
-	void RefreshListViews();
-	TSharedPtr<FMIForgeTextureInfo> FindTextureListItem(const FMIForgeTextureInfo& TextureInfo) const;
-
-	TSharedPtr<SWidget> GenerateRightClickMenuWidget();
-
 	TSharedRef<SWidget> Page1();
 	TSharedRef<SWidget> PresetComboBox();
 	TSharedRef<SWidget> PresetPannelSwitcher();
-	TSharedRef<SWidget> ListViewSwitcher();
-	TSharedRef<SWidget> IndividualModeListView();
-	TSharedRef<SWidget> TextureSetModeListView();
-	TSharedPtr<SHeaderRow> SetupHeaderRow();
-	TSharedPtr<SHeaderRow> SetupTexSetHeaderRow();
 	TSharedRef<SWidget> RightContentWidget();
 
 	TSharedRef<SWidget> StandardPresetPannel();
@@ -102,42 +78,11 @@ private:
 	const FAssetData* GetVertexPaintLayerThumbnailAsset(EMIForgeVertexPaintLayer Layer) const;
 
 private:
-	TArray<FString> SelectedFolderPaths;
-	
 	TSharedPtr<SWidgetSwitcher> PresetPannelSwitcher0;
 	//TSharedPtr<SEditableTextBox> TargetPathInputBox;
 
-	TSharedPtr<SInlineEditableTextBlock> TexturePathTextBlock;
-#pragma region Filter related members
-
-	TSharedPtr<STextBlock> CurrentFilterComboBoxSelectedOptionText;  
 	TSharedPtr<STextBlock> CurrentMaxLayersComboBoxSelectedOptionText;
-
-	TArray<TSharedPtr<FString>> ActiveFilterOptions;
-	TSharedPtr<FString> CurrentFilterOption;
-
-	TArray<TSharedPtr<FString>> TextureFilterOptions;
-	TSharedPtr<FString> CurrentTextureFilterOption;
-
-	TArray<TSharedPtr<FString>> TextureSetFilterOptions;
-	TSharedPtr<FString> CurrentTextureSetFilterOption;
-
-	TSharedPtr<SComboBox<TSharedPtr<FString>>> FilterComboBox;
-
-	FText CurrentSearchText;
-#pragma endregion
 	TSharedPtr<FString> CurrentMaxLayersOption;
-
-	TSharedPtr<SListView<TSharedPtr<FMIForgeTextureInfo>>> TexListView;
-	TSharedPtr<SListView<TSharedPtr<FMIForgeTextureSet>>> TexSetListView;
-	TSharedPtr<SWidgetSwitcher> ViewModeSwitcher0;
-
-	TArray<TSharedPtr<FMIForgeTextureInfo>> TextureListItems;
-	TArray<TSharedPtr<FMIForgeTextureInfo>> FilteredTextureListItems;
-	
-
-	TArray<TSharedPtr<FMIForgeTextureSet>> TextureSetListItems;
-	TArray<TSharedPtr<FMIForgeTextureSet>> FilteredTextureSetListItems;
 	
 
 	TArray<TSharedPtr<FMIForgeTextureInfo>> ResolvedTextures;
@@ -159,6 +104,7 @@ private:
 	TSharedPtr<STextBlock> CurrentVertexPaintRecipeOptionText;
 
 	TSharedPtr<FMIForgeMainTabViewModel> ViewModel;
+	TSharedPtr<FMIForgeTextureCatalog> TextureCatalog;
 
 	TArray<TSharedPtr<EMIForgeGenerationPreset>>
 		PresetOptions;
@@ -166,8 +112,6 @@ private:
 	void HandlePresetChanged(
 		EMIForgeGenerationPreset NewPreset);
 
-	void HandleGenerationOptionsChanged();
-	void HandleSelectionChanged();
 	void HandleVertexPaintChanged();
 	
 };

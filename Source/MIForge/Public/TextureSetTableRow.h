@@ -6,8 +6,12 @@
 
 
 struct FMIForgeTextureSet;
-class SMainTabWidget;
 class FMIForgeMainTabViewModel;
+
+DECLARE_DELEGATE_TwoParams(
+	FMIForgeOnTextureSetCheckStateChanged,
+	const TSharedPtr<FMIForgeTextureSet>&,
+	ECheckBoxState)
 
 
 class STextureSetTableRow : public SMultiColumnTableRow<TSharedPtr<FMIForgeTextureSet>>
@@ -15,8 +19,10 @@ class STextureSetTableRow : public SMultiColumnTableRow<TSharedPtr<FMIForgeTextu
 public:
     SLATE_BEGIN_ARGS(STextureSetTableRow) {}
         SLATE_ARGUMENT(TSharedPtr<FMIForgeTextureSet>, TextureSets)
-        SLATE_ARGUMENT(TSharedPtr<SMainTabWidget>, ParentTable)
 		SLATE_ARGUMENT(TSharedPtr<FMIForgeMainTabViewModel>, ViewModel)
+		SLATE_EVENT(
+			FMIForgeOnTextureSetCheckStateChanged,
+			OnTextureSetCheckStateChanged)
     SLATE_END_ARGS()
 
     void Construct(
@@ -38,6 +44,6 @@ public:
 
 private:
     TSharedPtr<FMIForgeTextureSet> TextureSets;
-    TSharedPtr<SMainTabWidget> ParentTable;
     TSharedPtr<FMIForgeMainTabViewModel> ViewModel;
+	FMIForgeOnTextureSetCheckStateChanged OnTextureSetCheckStateChanged;
 };

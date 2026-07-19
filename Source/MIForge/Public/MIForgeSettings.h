@@ -23,7 +23,7 @@ struct FMIForgeTextureCompressionSettings
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, Category = "Texture Compression")
-	TEnumAsByte<TextureCompressionSettings> CompressionSettings;
+	TEnumAsByte<TextureCompressionSettings> CompressionSettings = TC_Default;
 	UPROPERTY(EditAnywhere, Category = "Texture Compression")
 	bool bSRGB = true;
 };
