@@ -17,6 +17,7 @@ public:
 #pragma region ContentBrowserMenu
 
 	void InitializeMenuExtension();
+	void UnregisterMenuExtension();
 	TSharedRef<FExtender> CustomMenuExtender(const TArray<FString>& SelectedPaths);	
 	void MenuEntry(class FMenuBuilder& MenuBuilder);
 
@@ -40,10 +41,16 @@ public:
 #pragma region BatchMIParamsAdjustor
 
 	 void RegisterActorContextMenu();
+
+	 void ExtendActorContextMenu();
+	 void UnregisterActorContextMenu();
 	 
 #pragma endregion
 private:
 	TArray<FString> SelectedFolderPaths;
+
+	FDelegateHandle ContentBrowserPathExtenderHandle;
+
 	void OpenBatchParameterAdjusterFromSelection();
 
 	void OpenBatchParameterEditorTab(

@@ -31,6 +31,9 @@ void FMIForgeModule::StartupModule()
 
 void FMIForgeModule::ShutdownModule()
 {	
+	UnregisterActorContextMenu();
+	UnregisterMenuExtension();
+
 	UnregisterBatchParameterEditorTabSpawner();
 	UnregisterTabSpawner();
 	FMIForgeStyle::Shutdown();
@@ -38,14 +41,56 @@ void FMIForgeModule::ShutdownModule()
 
 void FMIForgeModule::InitializeMenuExtension()
 {
-	// add right-click menu entry to content browser
+	FContentBrowserModule& ContentBrowserModule =
+		FModuleManager::LoadModuleChecked<FContentBrowserModule>(
+			TEXT("ContentBrowser"));
 
-	FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
+	TArray<FContentBrowserMenuExtender_SelectedPaths>& MenuExtenders =
+		ContentBrowserModule
+		.GetAllPathViewContextMenuExtenders();
 
-	TArray<FContentBrowserMenuExtender_SelectedPaths>& MenuExtenders = ContentBrowserModule.GetAllPathViewContextMenuExtenders();
+	FContentBrowserMenuExtender_SelectedPaths ExtenderDelegate =
+		FContentBrowserMenuExtender_SelectedPaths::CreateRaw(
+			this,
+			&FMIForgeModule::CustomMenuExtender);
 
-	//Delegate for menu extender, will be called when right-clicking in the content browser
-	MenuExtenders.Add(FContentBrowserMenuExtender_SelectedPaths::CreateRaw(this, &FMIForgeModule::CustomMenuExtender));
+	ContentBrowserPathExtenderHandle =
+		ExtenderDelegate.GetHandle();
+
+	MenuExtenders.Add(MoveTemp(ExtenderDelegate));
+}
+
+void FMIForgeModule::UnregisterMenuExtension()
+{
+	if (!ContentBrowserPathExtenderHandle.IsValid())
+	{
+		return;
+	}
+
+	if (FModuleManager::Get().IsModuleLoaded(
+		TEXT("ContentBrowser")))
+	{
+		FContentBrowserModule& ContentBrowserModule =
+			FModuleManager::GetModuleChecked<
+			FContentBrowserModule>(
+				TEXT("ContentBrowser"));
+
+		TArray<FContentBrowserMenuExtender_SelectedPaths>&
+			MenuExtenders =
+			ContentBrowserModule
+			.GetAllPathViewContextMenuExtenders();
+
+		MenuExtenders.RemoveAll(
+			[this](
+				const FContentBrowserMenuExtender_SelectedPaths&
+				ExtenderDelegate)
+			{
+				return ExtenderDelegate.GetHandle() ==
+					ContentBrowserPathExtenderHandle;
+			});
+	}
+
+	ContentBrowserPathExtenderHandle.Reset();
 }
 
 TSharedRef<FExtender> FMIForgeModule::CustomMenuExtender(const TArray<FString>& SelectedPaths)
@@ -155,24 +200,49 @@ TSharedRef<SDockTab> FMIForgeModule::OnSpawnBatchParameterEditorTab(const FSpawn
 void FMIForgeModule::RegisterActorContextMenu()
 {
 	UToolMenus::RegisterStartupCallback(
-		FSimpleMulticastDelegate::FDelegate::CreateLambda([this]()
-		{
-			UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("LevelEditor.ActorContextMenu");
-			FToolMenuSection& Section = Menu->AddSection("MIForge", FText::FromString("MIForge"), FToolMenuInsert(TEXT("ActorGeneral"), EToolMenuInsertType::After));
-			Section.AddMenuEntry(
-				"MIForge_BatchAdjustMIParameters",
-				FText::FromString(TEXT("MIForge: Batch Adjust MI Parameters")),
-				FText::FromString(TEXT("Batch edit Material Instance parameters from selected viewport actors.")),
-				FSlateIcon(FMIForgeStyle::GetStyleSetName(), "MIForgeLogo.Compact"),
-				FUIAction(
-					FExecuteAction::CreateRaw(
-						this,
-						&FMIForgeModule::OpenBatchParameterAdjusterFromSelection
-					)
-				)
-			);
-		})
-	);
+		FSimpleMulticastDelegate::FDelegate::CreateRaw(
+			this,
+			&FMIForgeModule::ExtendActorContextMenu));
+}
+
+void FMIForgeModule::ExtendActorContextMenu()
+{
+	FToolMenuOwnerScoped OwnerScoped(this);
+
+	UToolMenu* Menu =
+		UToolMenus::Get()->ExtendMenu(
+			TEXT("LevelEditor.ActorContextMenu"));
+
+	FToolMenuSection& Section =
+		Menu->AddSection(
+			TEXT("MIForge"),
+			FText::FromString(TEXT("MIForge")),
+			FToolMenuInsert(
+				TEXT("ActorGeneral"),
+				EToolMenuInsertType::After));
+
+	Section.AddMenuEntry(
+		TEXT("MIForge_BatchAdjustMIParameters"),
+		FText::FromString(
+			TEXT("MIForge: Batch Adjust MI Parameters")),
+		FText::FromString(
+			TEXT(
+				"Batch edit Material Instance parameters "
+				"from selected viewport actors.")),
+		FSlateIcon(
+			FMIForgeStyle::GetStyleSetName(),
+			TEXT("MIForgeLogo.Compact")),
+		FUIAction(
+			FExecuteAction::CreateRaw(
+				this,
+				&FMIForgeModule::
+				OpenBatchParameterAdjusterFromSelection)));
+}
+
+void FMIForgeModule::UnregisterActorContextMenu()
+{
+	UToolMenus::UnRegisterStartupCallback(this);
+	UToolMenus::UnregisterOwner(this);
 }
 
 namespace

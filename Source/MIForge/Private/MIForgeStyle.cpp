@@ -4,6 +4,7 @@
 #include "MIForgeStyle.h"
 #include "Styling/SlateStyleRegistry.h" 
 #include "Styling/SlateStyleMacros.h"
+#include "Interfaces/IPluginManager.h"
 
 #define RootToContentDir StyleSet->RootToContentDir
 
@@ -39,8 +40,26 @@ const ISlateStyle& FMIForgeStyle::Get()
 TSharedRef<FSlateStyleSet> FMIForgeStyle::CreateStyleSet()
 {
 	TSharedRef<FSlateStyleSet> StyleSet = MakeShareable(new FSlateStyleSet(GetStyleSetName()));
-	const FString ContentDir = FPaths::ProjectPluginsDir() / TEXT("MIForge/Resources");
-	StyleSet->SetContentRoot(ContentDir / TEXT("Icons"));
+
+	const TSharedPtr<IPlugin> MIForgePlugin =
+		IPluginManager::Get().FindPlugin(TEXT("MIForge"));
+
+	if (!ensureMsgf(
+		MIForgePlugin.IsValid(),
+		TEXT("Could not find the MIForge plugin descriptor.")))
+	{
+		return StyleSet;
+	}
+
+	const FString ResourcesDirectory =
+		FPaths::Combine(
+			MIForgePlugin->GetBaseDir(),
+			TEXT("Resources"));
+
+	StyleSet->SetContentRoot(
+		FPaths::Combine(
+			ResourcesDirectory,
+			TEXT("Icons")));
 	
 	const FVector2D Icon16x16(16.0f, 16.0f);
 	const FVector2D Icon20x20(20.0f, 20.0f);
