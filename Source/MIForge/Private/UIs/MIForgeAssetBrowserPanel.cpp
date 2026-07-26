@@ -517,7 +517,7 @@ void SMIForgeAssetBrowserPanel::SelectTexturesInSet(
 
 		if (ViewModel->GetUseDecalNormal())
 		{
-			SelectTextureType(EMIForgeTextureType::DetailNormal);
+			SelectTextureType(EMIForgeTextureType::Normal);
 		}
 		if(ViewModel->GetUseDecalORM())
 		{
