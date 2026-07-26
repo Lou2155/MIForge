@@ -45,6 +45,9 @@ DEFINE_SPEC(
 					const FMIForgeMaterialPresetDefinition* RGBMask =
 						FMIForgePresetDefinitions::FindMaterialPreset(
 							EMIForgeGenerationPreset::RGBMask);
+					const FMIForgeMaterialPresetDefinition* Decal =
+						FMIForgePresetDefinitions::FindMaterialPreset(
+							EMIForgeGenerationPreset::Decal);
 					const FMIForgeMaterialPresetDefinition* VertexPainting =
 						FMIForgePresetDefinitions::FindMaterialPreset(
 							EMIForgeGenerationPreset::VertexPainting);
@@ -55,6 +58,9 @@ DEFINE_SPEC(
 					TestTrue(
 						TEXT("RGB Mask preset resolves to its definition"),
 						RGBMask == &FMIForgePresetDefinitions::GetRGBMask());
+					TestTrue(
+						TEXT("Decal preset resolves to its definition"),
+						Decal == &FMIForgePresetDefinitions::GetDecal());
 					TestNull(
 						TEXT("Vertex Painting is not a material preset"),
 						VertexPainting);
@@ -395,6 +401,124 @@ DEFINE_SPEC(
 					CheckStaticSwitch(
 						EMIForgePresetOptions::UseDetailNormalTexture,
 						TEXT("UseDetailNormal?"));
+				});
+		});
+
+	Describe("Decal", [this]()
+		{
+			It("should describe the Decal material contract", [this]()
+				{
+					const FMIForgeMaterialPresetDefinition& Definition =
+						FMIForgePresetDefinitions::GetDecal();
+
+					TestTrue(
+						TEXT("Correct preset"),
+						Definition.Preset ==
+						EMIForgeGenerationPreset::Decal);
+					TestEqual(
+						TEXT("Correct parent material"),
+						Definition.ParentMaterialPath.ToString(),
+						FString(TEXT(
+							"/MIForge/MasterMaterialPresets/"
+							"MM_Decal.MM_Decal")));
+					TestEqual(
+						TEXT("Texture binding count"),
+						Definition.TextureBindings.Num(),
+						3);
+					TestEqual(
+						TEXT("Static switch binding count"),
+						Definition.StaticSwitchBindings.Num(),
+						3);
+
+					auto CheckTextureBinding =
+						[this, &Definition](
+							EMIForgeTextureType TextureType,
+							const TCHAR* ExpectedParameter,
+							EMIForgeRequirement ExpectedRequirement,
+							EMIForgePresetOptions ExpectedOption)
+						{
+							const FMIForgeTextureBinding* Binding =
+								FindTextureBinding(Definition, TextureType);
+							TestNotNull(
+								*FString::Printf(
+									TEXT("%s texture binding exists"),
+									ExpectedParameter),
+								Binding);
+
+							if (!Binding)
+							{
+								return;
+							}
+
+							TestEqual(
+								*FString::Printf(
+									TEXT("%s parameter name"),
+									ExpectedParameter),
+								Binding->ParameterName.ToString(),
+								FString(ExpectedParameter));
+							TestTrue(
+								*FString::Printf(
+									TEXT("%s requirement"),
+									ExpectedParameter),
+								Binding->Requirement ==
+								ExpectedRequirement);
+							TestTrue(
+								*FString::Printf(
+									TEXT("%s activation option"),
+									ExpectedParameter),
+								Binding->PresetOption ==
+								ExpectedOption);
+						};
+
+					CheckTextureBinding(
+						EMIForgeTextureType::Albedo,
+						TEXT("Albedo"),
+						EMIForgeRequirement::Required,
+						EMIForgePresetOptions::None);
+					CheckTextureBinding(
+						EMIForgeTextureType::Normal,
+						TEXT("Normal"),
+						EMIForgeRequirement::Optional,
+						EMIForgePresetOptions::UseDecalNormal);
+					CheckTextureBinding(
+						EMIForgeTextureType::ORM,
+						TEXT("ORM"),
+						EMIForgeRequirement::Optional,
+						EMIForgePresetOptions::UseDecalORM);
+
+					auto CheckStaticSwitch =
+						[this, &Definition](
+							EMIForgePresetOptions Option,
+							const TCHAR* ExpectedParameter)
+						{
+							const FMIForgeStaticSwitchBinding* Binding =
+								FindSwitchBinding(Definition, Option);
+							TestNotNull(
+								*FString::Printf(
+									TEXT("%s static switch exists"),
+									ExpectedParameter),
+								Binding);
+
+							if (Binding)
+							{
+								TestEqual(
+									*FString::Printf(
+										TEXT("%s static switch parameter"),
+										ExpectedParameter),
+									Binding->ParameterName.ToString(),
+									FString(ExpectedParameter));
+							}
+						};
+
+					CheckStaticSwitch(
+						EMIForgePresetOptions::UseDecalNormal,
+						TEXT("UseNormal?"));
+					CheckStaticSwitch(
+						EMIForgePresetOptions::UseDecalORM,
+						TEXT("UseORM?"));
+					CheckStaticSwitch(
+						EMIForgePresetOptions::UseOrientationMask,
+						TEXT("UseOrientationMask?"));
 				});
 		});
 

@@ -8,6 +8,7 @@
 
 class FMIForgeMainTabViewModel;
 
+
 class SMIForgeValidationSummaryPanel : public SCompoundWidget
 {
 public:
@@ -20,7 +21,7 @@ public:
 private:
 	TSharedRef<SWidget> CreateMaterialSummaryWidget();
 	TSharedRef<SWidget> CreateVertexPaintSummaryWidget();
-	TSharedRef<SWidget> CreateMaterialValidationDetailsWidget(bool bRGBMask) const;
+	TSharedRef<SWidget> CreateMaterialValidationDetailsWidget(EMIForgeGenerationPreset Preset) const;
 
 	static FText VertexPaintStatusToText(EMIForgeVertexPaintLayerStatus Status);
 	static FSlateColor VertexPaintStatusToColor(EMIForgeVertexPaintLayerStatus Status);

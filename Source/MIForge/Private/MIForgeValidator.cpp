@@ -229,6 +229,30 @@ FMIForgeTextureSetValidationResult FMIForgeValidator::ValidateRGBSet(const FMIFo
 		bIgnoreUnrecognizedTextures);
 }
 
+FMIForgeTextureSetValidationResult FMIForgeValidator::ValidateDecalSet(const FMIForgeTextureSet& TextureSet, bool bUseDecalNormal, bool bUseDecalORM, bool bIgnoreUnrecognizedTextures) const
+{
+	FMIForgeValidationContext Context;
+	
+	if(bUseDecalNormal)
+	{
+		Context.EnabledOptions.Add(
+			EMIForgePresetOptions::UseDecalNormal);
+	}
+
+	if(bUseDecalORM)
+	{
+		Context.EnabledOptions.Add(
+			EMIForgePresetOptions::UseDecalORM);
+	}
+
+	return ValidateTextureSetByRules(
+		TextureSet,
+		BuildMaterialValidationRules(
+			FMIForgePresetDefinitions::GetDecal()),
+		Context,
+		bIgnoreUnrecognizedTextures);
+}
+
 FMIForgeVertexPaintLayerStackValidationResult FMIForgeValidator::ValidateVertexPaintLayerStack(const FMIForgeVertexPaintLayerStack& LayerStack, bool bIgnoreUnrecognizedTextures) const
 {
 	FMIForgeVertexPaintLayerStackValidationResult Result;
@@ -430,6 +454,14 @@ FMIForgeValidationSummary FMIForgeValidator::BuildRGBSummaryFromTextureSets(cons
 		});
 }
 
+FMIForgeValidationSummary FMIForgeValidator::BuildDecalSummaryFromTextureSets(const TArray<TSharedPtr<FMIForgeTextureSet>>& TextureSets, bool bUseDecalNormal, bool bUseDecalORM, bool bIgnoreUnrecognizedTextures) const
+{
+	return BuildSummaryFromTextureSets(TextureSets, [this, bUseDecalNormal, bUseDecalORM, bIgnoreUnrecognizedTextures](const FMIForgeTextureSet& Set)
+		{
+			return ValidateDecalSet(Set, bUseDecalNormal, bUseDecalORM, bIgnoreUnrecognizedTextures);
+		});
+}
+
 FMIForgeVertexPaintValidationSummary FMIForgeValidator::BuildVertexPaintLayerStackSummary(const FMIForgeVertexPaintLayerStackValidationResult& LayerStackResult) const
 {	
 	FMIForgeVertexPaintValidationSummary Summary;
@@ -539,5 +571,13 @@ FMIForgeValidationSummary FMIForgeValidator::BuildRGBSummaryFromTextures(const T
 	return BuildSummaryFromTextures(SelectedTextures, [this, bUseBaseORMTexture, bEnableEmissiveChannel, bUseDetailNormalTextureRGB, bIgnoreUnrecognizedTextures](const TArray<TSharedPtr<FMIForgeTextureSet>>& TextureSets)
 		{
 			return BuildRGBSummaryFromTextureSets(TextureSets, bUseBaseORMTexture, bEnableEmissiveChannel, bUseDetailNormalTextureRGB, bIgnoreUnrecognizedTextures);
+		});
+}
+
+FMIForgeValidationSummary FMIForgeValidator::BuildDecalSummaryFromTextures(const TArray<TSharedPtr<FMIForgeTextureInfo>>& SelectedTextures, bool bUseDecalNormal, bool bUseDecalORM, bool bUseOrientationMask, bool bIgnoreUnrecognizedTextures) const
+{
+	return BuildSummaryFromTextures(SelectedTextures, [this, bUseDecalNormal, bUseDecalORM, bUseOrientationMask, bIgnoreUnrecognizedTextures](const TArray<TSharedPtr<FMIForgeTextureSet>>& TextureSets)
+		{
+			return BuildDecalSummaryFromTextureSets(TextureSets, bUseDecalNormal, bUseDecalORM, bIgnoreUnrecognizedTextures);
 		});
 }

@@ -48,6 +48,7 @@ public:
 	EIfMIExistsOption GetIfMIExists() const;
 	void SetIfMIExists(EIfMIExistsOption NewOption);
 
+	//standard
 	bool GetUseEmissiveTextures() const;
 	void SetUseEmissiveTextures(bool bEnabled);
 
@@ -57,6 +58,7 @@ public:
 	bool GetUseTriplanarProjection() const;
 	void SetUseTriplanarProjection(bool bEnabled);
 
+	//RGB Mask
 	bool GetUseBaseORMTexture() const;
 	void SetUseBaseORMTexture(bool bEnabled);
 
@@ -65,6 +67,16 @@ public:
 
 	bool GetUseDetailNormalTextureRGB() const;
 	void SetUseDetailNormalTextureRGB(bool bEnabled);
+
+	//Decal
+	bool GetUseDecalNormal() const;
+	void SetUseDecalNormal(bool bEnabled);
+
+	bool GetUseDecalORM() const;
+	void SetUseDecalORM(bool bEnabled);
+
+	bool GetUseOrientationMask() const;
+	void SetUseOrientationMask(bool bEnabled);
 
 	bool GetIgnoreUnrecognizedTextures() const;
 	void SetIgnoreUnrecognizedTextures(bool bEnabled);
@@ -124,12 +136,20 @@ private:
 	FString TargetPath;
 	EIfMIExistsOption IfMIExists = EIfMIExistsOption::Skip;
 
+	//Standard Generation Options
 	bool bUseEmissiveTextures = false;
 	bool bUseDetailNormalTextures = false;
 	bool bUseTriplanarProjection = false;
+	//RGB Mask Generation Options
 	bool bUseBaseORMTexture = true;
 	bool bEnableEmissiveChannel = false;
 	bool bUseDetailNormalTextureRGB = false;
+
+	//Decal Generation Options
+	bool bUseDecalNormal = false;
+	bool bUseDecalORM = false;
+	bool bUseOrientationMask = false;
+
 	bool bIgnoreUnrecognizedTextures = false;
 
 	EMIForgeInputMode CurrentInputMode = EMIForgeInputMode::IndividualTextures;

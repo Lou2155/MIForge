@@ -336,6 +336,90 @@ void FMIForgeGenerationPlannerSpec::Define()
 			TestEqual(TEXT("Failed planning count"), Plan.FailedPlanningCount, 1);
 		});
 
+		It("should plan an Albedo-only Decal with its Decal asset name", [this]()
+		{
+			FPlannerTestContext Context;
+			const TSharedPtr<FMIForgeTextureSet> TextureSet =
+				Context.MakeTextureSet(
+					TEXT("Graffiti"),
+					{ EMIForgeTextureType::Albedo });
+			const FMIForgeGenerationOptions Options = MakeMaterialOptions(
+				EMIForgeGenerationPreset::Decal,
+				Context.TargetPath);
+
+			const FMIForgeMaterialGenerationPlan Plan =
+				FMIForgeGenerationPlanner().PlanMaterialGeneration(
+					{ TextureSet },
+					Options);
+
+			TestEqual(TEXT("Planned item count"), Plan.Items.Num(), 1);
+			TestEqual(TEXT("Failed planning count"), Plan.FailedPlanningCount, 0);
+
+			if (Plan.Items.Num() == 1)
+			{
+				TestEqual(
+					TEXT("Desired Decal asset name"),
+					Plan.Items[0].DesiredAssetName,
+					FString(TEXT("MI_Decal_Graffiti")));
+				TestNotNull(
+					TEXT("Decal parent material"),
+					Plan.Items[0].ParentMaterial);
+				TestTrue(
+					TEXT("Decal preset is preserved"),
+					Plan.Items[0].Options.Preset ==
+					EMIForgeGenerationPreset::Decal);
+			}
+
+			TestFalse(
+				TEXT("Planning does not create the Decal material instance"),
+				UEditorAssetLibrary::DoesAssetExist(
+					Context.ObjectPath(TEXT("MI_Decal_Graffiti"))));
+		});
+
+		It("should plan a Decal when requested optional textures are absent", [this]()
+		{
+			FPlannerTestContext Context;
+			const TSharedPtr<FMIForgeTextureSet> TextureSet =
+				Context.MakeTextureSet(
+					TEXT("OptionalMissing"),
+					{ EMIForgeTextureType::Albedo });
+			FMIForgeGenerationOptions Options = MakeMaterialOptions(
+				EMIForgeGenerationPreset::Decal,
+				Context.TargetPath);
+			Options.bUseDecalNormal = true;
+			Options.bUseDecalORM = true;
+			Options.bUseOrientationMask = true;
+
+			const FMIForgeMaterialGenerationPlan Plan =
+				FMIForgeGenerationPlanner().PlanMaterialGeneration(
+					{ TextureSet },
+					Options);
+
+			TestEqual(TEXT("Planned item count"), Plan.Items.Num(), 1);
+			TestEqual(TEXT("Failed planning count"), Plan.FailedPlanningCount, 0);
+		});
+
+		It("should reject a Decal without its required Albedo texture", [this]()
+		{
+			FPlannerTestContext Context;
+			const TSharedPtr<FMIForgeTextureSet> TextureSet =
+				Context.MakeTextureSet(
+					TEXT("MissingAlbedo"),
+					{ EMIForgeTextureType::Normal });
+			const FMIForgeGenerationOptions Options = MakeMaterialOptions(
+				EMIForgeGenerationPreset::Decal,
+				Context.TargetPath);
+
+			const FMIForgeMaterialGenerationPlan Plan =
+				FMIForgeGenerationPlanner().PlanMaterialGeneration(
+					{ TextureSet },
+					Options);
+
+			TestEqual(TEXT("Planned item count"), Plan.Items.Num(), 0);
+			TestEqual(TEXT("Failed planning count"), Plan.FailedPlanningCount, 1);
+			TestTrue(TEXT("Failure message recorded"), Plan.Messages.Num() > 0);
+		});
+
 		It("should reject an invalid generated package name", [this]()
 		{
 			FPlannerTestContext Context;

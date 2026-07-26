@@ -97,6 +97,28 @@ const FMIForgeVertexPaintPresetDefinition& FMIForgePresetDefinitions::GetVertexP
 	return Definition;
 }
 
+const FMIForgeMaterialPresetDefinition& FMIForgePresetDefinitions::GetDecal()
+{
+	static const FMIForgeMaterialPresetDefinition Definition = []()
+		{
+			FMIForgeMaterialPresetDefinition Result;
+			Result.Preset = EMIForgeGenerationPreset::Decal;
+			Result.ParentMaterialPath = FSoftObjectPath(TEXT("/MIForge/MasterMaterialPresets/MM_Decal.MM_Decal"));
+			Result.TextureBindings = {
+				{ EMIForgeTextureType::Albedo, FName(TEXT("Albedo")), EMIForgeRequirement::Required },
+				{ EMIForgeTextureType::Normal, FName(TEXT("Normal")), EMIForgeRequirement::Optional, EMIForgePresetOptions::UseDecalNormal },
+				{ EMIForgeTextureType::ORM, FName(TEXT("ORM")), EMIForgeRequirement::Optional, EMIForgePresetOptions::UseDecalORM }
+			};
+			Result.StaticSwitchBindings = {
+				{ FName(TEXT("UseNormal?")), EMIForgePresetOptions::UseDecalNormal },
+				{ FName(TEXT("UseORM?")), EMIForgePresetOptions::UseDecalORM },
+				{ FName(TEXT("UseOrientationMask?")), EMIForgePresetOptions::UseOrientationMask}
+			};
+			return Result;
+		}();
+	return Definition;
+}
+
 const FMIForgeMaterialPresetDefinition* FMIForgePresetDefinitions::FindMaterialPreset(EMIForgeGenerationPreset Preset)
 {
 	switch (Preset)
@@ -107,7 +129,10 @@ const FMIForgeMaterialPresetDefinition* FMIForgePresetDefinitions::FindMaterialP
 	case EMIForgeGenerationPreset::RGBMask:
 		return &GetRGBMask();
 
+	case EMIForgeGenerationPreset::Decal:
+		return &GetDecal();
 	case EMIForgeGenerationPreset::VertexPainting:
+		
 	default:
 		return nullptr;
 	}

@@ -510,6 +510,20 @@ void SMIForgeAssetBrowserPanel::SelectTexturesInSet(
 			SelectTextureType(EMIForgeTextureType::DetailNormal);
 		}
 	}
+	else if(ViewModel.IsValid() &&
+		ViewModel->GetPreset() == EMIForgeGenerationPreset::Decal)
+	{
+		SelectTextureType(EMIForgeTextureType::Albedo);
+
+		if (ViewModel->GetUseDecalNormal())
+		{
+			SelectTextureType(EMIForgeTextureType::DetailNormal);
+		}
+		if(ViewModel->GetUseDecalORM())
+		{
+			SelectTextureType(EMIForgeTextureType::ORM);
+		}
+	}
 
 	ViewModel->SetSelectedTextures(NewSelection);
 }
@@ -568,6 +582,19 @@ void SMIForgeAssetBrowserPanel::UnselectTexturesInSet(
 		if (ViewModel->GetUseDetailNormalTextureRGB())
 		{
 			UnselectTextureType(EMIForgeTextureType::DetailNormal);
+		}
+	}
+	else if(ViewModel.IsValid() &&
+		ViewModel->GetPreset() == EMIForgeGenerationPreset::Decal)
+	{
+		UnselectTextureType(EMIForgeTextureType::Albedo);
+		if (ViewModel->GetUseDecalNormal())
+		{
+			UnselectTextureType(EMIForgeTextureType::DetailNormal);
+		}
+		if(ViewModel->GetUseDecalORM())
+		{
+			UnselectTextureType(EMIForgeTextureType::ORM);
 		}
 	}
 
@@ -690,6 +717,15 @@ void SMIForgeAssetBrowserPanel::RefreshFilteredTextureSets()
 					ViewModel->GetUseBaseORMTexture(),
 					ViewModel->GetEnableEmissiveChannel(),
 					ViewModel->GetUseDetailNormalTextureRGB(),
+					ViewModel->GetIgnoreUnrecognizedTextures());
+			}
+			else if(ViewModel.IsValid() &&
+				ViewModel->GetPreset() == EMIForgeGenerationPreset::Decal)
+			{
+				Status = Validator.GetDecalSetStatus(
+					*TextureSet,
+					ViewModel->GetUseDecalNormal(),
+					ViewModel->GetUseDecalORM(),
 					ViewModel->GetIgnoreUnrecognizedTextures());
 			}
 			else

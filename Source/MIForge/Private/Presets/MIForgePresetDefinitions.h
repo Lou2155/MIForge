@@ -12,7 +12,10 @@ enum class EMIForgePresetOptions : uint8
 	UseDetailNormalTexture,
 	UseTriplanar,
 	UseBaseORM,
-	EnableEmissiveChannel
+	EnableEmissiveChannel,
+	UseDecalNormal,
+	UseDecalORM,
+	UseOrientationMask
 };
 
 enum class EMIForgeRequirement : uint8
@@ -101,6 +104,7 @@ public:
 	static const FMIForgeMaterialPresetDefinition& GetStandard();
 	static const FMIForgeMaterialPresetDefinition& GetRGBMask();
 	static const FMIForgeVertexPaintPresetDefinition& GetVertexPaint();
+	static const FMIForgeMaterialPresetDefinition& GetDecal();
 
 	static const FMIForgeMaterialPresetDefinition* FindMaterialPreset(EMIForgeGenerationPreset Preset);
 };

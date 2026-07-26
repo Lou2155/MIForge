@@ -5,6 +5,8 @@
 #include "AssetRegistry/AssetData.h"
 #include "EditorAssetLibrary.h"
 #include "Engine/Texture2D.h"
+#include "MaterialEditingLibrary.h"
+#include "Materials/MaterialInstanceConstant.h"
 #include "Misc/Guid.h"
 #include "UObject/Package.h"
 
@@ -124,6 +126,15 @@ namespace MIForgeMaterialInstanceGeneratorSpec
 	{
 		FMIForgeGenerationOptions Options;
 		Options.Preset = EMIForgeGenerationPreset::Standard;
+		Options.TargetPath = TargetPath;
+		Options.IfMIExists = EIfMIExistsOption::Skip;
+		return Options;
+	}
+
+	FMIForgeGenerationOptions MakeDecalOptions(const FString& TargetPath)
+	{
+		FMIForgeGenerationOptions Options;
+		Options.Preset = EMIForgeGenerationPreset::Decal;
 		Options.TargetPath = TargetPath;
 		Options.IfMIExists = EIfMIExistsOption::Skip;
 		return Options;
@@ -358,7 +369,156 @@ void FMIForgeMaterialInstanceGeneratorSpec::Define()
 			TestTrue(
 				TEXT("RGB material instance exists"),
 				UEditorAssetLibrary::DoesAssetExist(
-					Context.ObjectPath(TEXT("MI_RGBEmissiveChannel"))));
+					Context.ObjectPath(TEXT("MI_RGB_RGBEmissiveChannel"))));
+		});
+
+		It("should generate an Albedo-only Decal material instance", [this]()
+		{
+			FGeneratorTestContext Context;
+			const TSharedPtr<FMIForgeTextureSet> TextureSet =
+				Context.MakeTextureSet(
+					TEXT("Graffiti"),
+					{ EMIForgeTextureType::Albedo });
+			const FMIForgeGenerationOptions Options =
+				MakeDecalOptions(Context.TargetPath);
+
+			const FMIForgeGenerationResult Result =
+				FMIForgeMaterialInstanceGenerator().GenerateMaterialInstances(
+					{ TextureSet },
+					Options);
+			Context.Track(Result);
+
+			TestEqual(TEXT("Created count"), Result.CreatedCount, 1);
+			TestEqual(TEXT("Failed count"), Result.FailedCount, 0);
+			TestEqual(
+				TEXT("Created asset count"),
+				Result.CreatedAssets.Num(),
+				1);
+			TestTrue(
+				TEXT("Decal material instance exists"),
+				UEditorAssetLibrary::DoesAssetExist(
+					Context.ObjectPath(TEXT("MI_Decal_Graffiti"))));
+
+			UMaterialInstanceConstant* MaterialInstance =
+				Result.CreatedAssets.Num() == 1
+				? Cast<UMaterialInstanceConstant>(Result.CreatedAssets[0])
+				: nullptr;
+			TestNotNull(TEXT("Created asset is a material instance"), MaterialInstance);
+
+			if (MaterialInstance)
+			{
+				const FMIForgeTextureInfo* Albedo =
+					TextureSet->Textures.Find(EMIForgeTextureType::Albedo);
+				UTexture* ExpectedAlbedo = Albedo
+					? Cast<UTexture>(Albedo->AssetData.GetAsset())
+					: nullptr;
+
+				TestTrue(
+					TEXT("Albedo texture is assigned"),
+					UMaterialEditingLibrary::
+						GetMaterialInstanceTextureParameterValue(
+							MaterialInstance,
+							FName(TEXT("Albedo"))) ==
+					ExpectedAlbedo);
+				TestFalse(
+					TEXT("Normal switch is disabled"),
+					UMaterialEditingLibrary::
+						GetMaterialInstanceStaticSwitchParameterValue(
+							MaterialInstance,
+							FName(TEXT("UseNormal?"))));
+				TestFalse(
+					TEXT("ORM switch is disabled"),
+					UMaterialEditingLibrary::
+						GetMaterialInstanceStaticSwitchParameterValue(
+							MaterialInstance,
+							FName(TEXT("UseORM?"))));
+				TestFalse(
+					TEXT("Orientation Mask switch is disabled"),
+					UMaterialEditingLibrary::
+						GetMaterialInstanceStaticSwitchParameterValue(
+							MaterialInstance,
+							FName(TEXT("UseOrientationMask?"))));
+			}
+		});
+
+		It("should assign requested Decal textures and enable their switches", [this]()
+		{
+			FGeneratorTestContext Context;
+			const TSharedPtr<FMIForgeTextureSet> TextureSet =
+				Context.MakeTextureSet(
+					TEXT("WetMark"),
+					{
+						EMIForgeTextureType::Albedo,
+						EMIForgeTextureType::Normal,
+						EMIForgeTextureType::ORM
+					});
+			FMIForgeGenerationOptions Options =
+				MakeDecalOptions(Context.TargetPath);
+			Options.bUseDecalNormal = true;
+			Options.bUseDecalORM = true;
+			Options.bUseOrientationMask = true;
+
+			const FMIForgeGenerationResult Result =
+				FMIForgeMaterialInstanceGenerator().GenerateMaterialInstances(
+					{ TextureSet },
+					Options);
+			Context.Track(Result);
+
+			TestEqual(TEXT("Created count"), Result.CreatedCount, 1);
+			TestEqual(TEXT("Failed count"), Result.FailedCount, 0);
+
+			UMaterialInstanceConstant* MaterialInstance =
+				Result.CreatedAssets.Num() == 1
+				? Cast<UMaterialInstanceConstant>(Result.CreatedAssets[0])
+				: nullptr;
+			TestNotNull(TEXT("Created asset is a material instance"), MaterialInstance);
+
+			if (MaterialInstance)
+			{
+				auto GetExpectedTexture =
+					[&TextureSet](EMIForgeTextureType TextureType)
+					{
+						const FMIForgeTextureInfo* TextureInfo =
+							TextureSet->Textures.Find(TextureType);
+						return TextureInfo
+							? Cast<UTexture>(
+								TextureInfo->AssetData.GetAsset())
+							: nullptr;
+					};
+
+				TestTrue(
+					TEXT("Normal texture is assigned"),
+					UMaterialEditingLibrary::
+						GetMaterialInstanceTextureParameterValue(
+							MaterialInstance,
+							FName(TEXT("Normal"))) ==
+					GetExpectedTexture(EMIForgeTextureType::Normal));
+				TestTrue(
+					TEXT("ORM texture is assigned"),
+					UMaterialEditingLibrary::
+						GetMaterialInstanceTextureParameterValue(
+							MaterialInstance,
+							FName(TEXT("ORM"))) ==
+					GetExpectedTexture(EMIForgeTextureType::ORM));
+				TestTrue(
+					TEXT("Normal switch is enabled"),
+					UMaterialEditingLibrary::
+						GetMaterialInstanceStaticSwitchParameterValue(
+							MaterialInstance,
+							FName(TEXT("UseNormal?"))));
+				TestTrue(
+					TEXT("ORM switch is enabled"),
+					UMaterialEditingLibrary::
+						GetMaterialInstanceStaticSwitchParameterValue(
+							MaterialInstance,
+							FName(TEXT("UseORM?"))));
+				TestTrue(
+					TEXT("Orientation Mask switch is enabled"),
+					UMaterialEditingLibrary::
+						GetMaterialInstanceStaticSwitchParameterValue(
+							MaterialInstance,
+							FName(TEXT("UseOrientationMask?"))));
+			}
 		});
 	});
 

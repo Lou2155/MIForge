@@ -9,6 +9,7 @@
 #include "UIs/MIForgeStandardPresetPanel.h"
 #include "UIs/MIForgeVertexPaintLayerStackPanel.h"
 #include "UIs/MIForgeVertexPaintPresetPanel.h"
+#include "UIs/MIForgeDecalPresetPanel.h"
 #include "Widgets/Input/SComboBox.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Layout/SSeparator.h"
@@ -22,7 +23,8 @@ void SMainTabWidget::Construct(const FArguments& InArgs)
 	{
 		MakeShared<EMIForgeGenerationPreset>(EMIForgeGenerationPreset::Standard),
 		MakeShared<EMIForgeGenerationPreset>(EMIForgeGenerationPreset::RGBMask),
-		MakeShared<EMIForgeGenerationPreset>(EMIForgeGenerationPreset::VertexPainting)
+		MakeShared<EMIForgeGenerationPreset>(EMIForgeGenerationPreset::VertexPainting),
+		MakeShared<EMIForgeGenerationPreset>(EMIForgeGenerationPreset::Decal)
 	};
 
 	ViewModel->OnPresetChanged.AddSP(
@@ -136,7 +138,12 @@ TSharedRef<SWidget> SMainTabWidget::BuildPresetPanelSwitcher()
 		+ SWidgetSwitcher::Slot()
 		[
 			SNew(SMIForgeVertexPaintPresetPanel).ViewModel(ViewModel)
+		]
+		+ SWidgetSwitcher::Slot()
+		[
+			SNew(SMIForgeDecalPresetPanel).ViewModel(ViewModel)
 		];
+
 }
 
 TSharedRef<SWidget> SMainTabWidget::BuildAssetWorkSpace()
@@ -167,6 +174,9 @@ void SMainTabWidget::HandlePresetChanged(EMIForgeGenerationPreset NewPreset)
 		break;
 	case EMIForgeGenerationPreset::VertexPainting:
 		PresetPanelSwitcher->SetActiveWidgetIndex(2);
+		break;
+	case EMIForgeGenerationPreset::Decal:
+		PresetPanelSwitcher->SetActiveWidgetIndex(3);
 		break;
 	}
 }

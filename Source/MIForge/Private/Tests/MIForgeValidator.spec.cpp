@@ -316,6 +316,116 @@ void FMIForgeValidatorSpec::Define()
 
 	});
 
+	Describe("ValidateDecalSet", [this]()
+	{
+		It("should accept an Albedo-only Decal when optional textures are disabled", [this]()
+		{
+			const FMIForgeTextureSet Set = MakeSet(
+				TEXT("Graffiti"),
+				{ EMIForgeTextureType::Albedo });
+
+			const FMIForgeTextureSetValidationResult Result =
+				FMIForgeValidator().ValidateDecalSet(
+					Set,
+					false,
+					false,
+					false);
+
+			TestTrue(TEXT("Can generate"), Result.bCanGenerate);
+			TestEqual(
+				TEXT("Missing required count"),
+				Result.MissingRequiredTextures.Num(),
+				0);
+			TestEqual(
+				TEXT("Missing optional count"),
+				Result.MissingOptionalTextures.Num(),
+				0);
+		});
+
+		It("should warn about requested Normal and ORM without blocking generation", [this]()
+		{
+			const FMIForgeTextureSet Set = MakeSet(
+				TEXT("Graffiti"),
+				{ EMIForgeTextureType::Albedo });
+
+			const FMIForgeTextureSetValidationResult Result =
+				FMIForgeValidator().ValidateDecalSet(
+					Set,
+					true,
+					true,
+					false);
+
+			TestTrue(TEXT("Can generate"), Result.bCanGenerate);
+			TestEqual(
+				TEXT("Missing optional count"),
+				Result.MissingOptionalTextures.Num(),
+				2);
+			TestTrue(
+				TEXT("Missing Normal"),
+				ContainsRequirement(
+					Result.MissingOptionalTextures,
+					EMIForgeTextureType::Normal));
+			TestTrue(
+				TEXT("Missing ORM"),
+				ContainsRequirement(
+					Result.MissingOptionalTextures,
+					EMIForgeTextureType::ORM));
+		});
+
+		It("should reject a Decal without Albedo", [this]()
+		{
+			const FMIForgeTextureSet Set = MakeSet(
+				TEXT("Graffiti"),
+				{ EMIForgeTextureType::Normal });
+
+			const FMIForgeTextureSetValidationResult Result =
+				FMIForgeValidator().ValidateDecalSet(
+					Set,
+					true,
+					false,
+					false);
+
+			TestFalse(TEXT("Cannot generate"), Result.bCanGenerate);
+			TestEqual(
+				TEXT("Missing required count"),
+				Result.MissingRequiredTextures.Num(),
+				1);
+			TestTrue(
+				TEXT("Missing Albedo"),
+				ContainsRequirement(
+					Result.MissingRequiredTextures,
+					EMIForgeTextureType::Albedo));
+		});
+
+		It("should accept requested Decal textures when they are present", [this]()
+		{
+			const FMIForgeTextureSet Set = MakeSet(
+				TEXT("Graffiti"),
+				{
+					EMIForgeTextureType::Albedo,
+					EMIForgeTextureType::Normal,
+					EMIForgeTextureType::ORM
+				});
+
+			const FMIForgeTextureSetValidationResult Result =
+				FMIForgeValidator().ValidateDecalSet(
+					Set,
+					true,
+					true,
+					false);
+
+			TestTrue(TEXT("Can generate"), Result.bCanGenerate);
+			TestEqual(
+				TEXT("Missing optional count"),
+				Result.MissingOptionalTextures.Num(),
+				0);
+			TestEqual(
+				TEXT("Applied texture count"),
+				Result.SuccessfulAppliedTextures.Num(),
+				3);
+		});
+	});
+
 	Describe("ValidateVertexPaintSet", [this]()
 	{
 		It("should require only Albedo and report the other supported types as optional", [this]()

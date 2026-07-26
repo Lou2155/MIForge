@@ -68,7 +68,7 @@ void SMIForgeValidationSummaryPanel::Construct(const FArguments& InArgs)
 					{
 						PopupWindowCreator::OpenPopupWindow(
 							FText::FromString(TEXT("Validation Details")),
-							CreateMaterialValidationDetailsWidget(false),
+							CreateMaterialValidationDetailsWidget(EMIForgeGenerationPreset::Standard),
 							FVector2D(560.f, 460.f),
 							true);
 					}
@@ -76,7 +76,15 @@ void SMIForgeValidationSummaryPanel::Construct(const FArguments& InArgs)
 					{
 						PopupWindowCreator::OpenPopupWindow(
 							FText::FromString(TEXT("Validation Details")),
-							CreateMaterialValidationDetailsWidget(true),
+							CreateMaterialValidationDetailsWidget(EMIForgeGenerationPreset::RGBMask),
+							FVector2D(560.f, 460.f),
+							true);
+					}
+					else if (ViewModel->GetPreset() == EMIForgeGenerationPreset::Decal)
+					{
+						PopupWindowCreator::OpenPopupWindow(
+							FText::FromString(TEXT("Validation Details")),
+							CreateMaterialValidationDetailsWidget(EMIForgeGenerationPreset::Decal),
 							FVector2D(560.f, 460.f),
 							true);
 					}
@@ -330,7 +338,7 @@ TSharedRef<SWidget> SMIForgeValidationSummaryPanel::CreateVertexPaintSummaryWidg
 		];
 }
 
-TSharedRef<SWidget> SMIForgeValidationSummaryPanel::CreateMaterialValidationDetailsWidget(bool bRGBMask) const
+TSharedRef<SWidget> SMIForgeValidationSummaryPanel::CreateMaterialValidationDetailsWidget(EMIForgeGenerationPreset Preset) const
 {
 	TSharedRef<SScrollBox> ScrollBox = SNew(SScrollBox);
 	const FMIForgeValidationSummary& Summary = ViewModel->GetValidationSummary();
@@ -344,17 +352,19 @@ TSharedRef<SWidget> SMIForgeValidationSummaryPanel::CreateMaterialValidationDeta
 		return ScrollBox;
 	}
 
-	auto TextureTypeToText = [bRGBMask](EMIForgeTextureType Type)
+	auto TextureTypeToText = [Preset](EMIForgeTextureType Type)
 	{
 		switch (Type)
 		{
 		case EMIForgeTextureType::Albedo: return FText::FromString(TEXT("Albedo"));
 		case EMIForgeTextureType::Normal: return FText::FromString(TEXT("Normal"));
 		case EMIForgeTextureType::RGB:
-			return bRGBMask ? FText::FromString(TEXT("RGB Mask")) : FText::FromString(TEXT("Unknown"));
+			return Preset == EMIForgeGenerationPreset::RGBMask ? FText::FromString(TEXT("RGB Mask")) : FText::FromString(TEXT("Unknown"));
 		case EMIForgeTextureType::ORM: return FText::FromString(TEXT("ORM"));
-		case EMIForgeTextureType::Emissive: return FText::FromString(TEXT("Emissive"));
-		case EMIForgeTextureType::DetailNormal: return FText::FromString(TEXT("Detail Normal"));
+		case EMIForgeTextureType::Emissive:
+			return Preset == EMIForgeGenerationPreset::Standard ? FText::FromString(TEXT("Emissive")) : FText::FromString(TEXT("Unknown"));
+		case EMIForgeTextureType::DetailNormal:
+			return Preset == EMIForgeGenerationPreset::Standard || Preset == EMIForgeGenerationPreset::RGBMask ? FText::FromString(TEXT("Detail Normal")) : FText::FromString(TEXT("Unknown"));
 		default: return FText::FromString(TEXT("Unknown"));
 		}
 	};

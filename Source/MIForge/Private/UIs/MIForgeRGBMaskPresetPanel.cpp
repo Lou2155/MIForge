@@ -84,7 +84,7 @@ void SMIForgeRGBMaskPresetPanel::Construct(const FArguments& InArgs)
 		+ SVerticalBox::Slot().AutoHeight().Padding(2.f)
 		[
 			SNew(STextBlock)
-			.Text(FText::FromString(TEXT("Instance Options")))
+			.Text(FText::FromString(TEXT("If MI exists: ")))
 			.Font(FCoreStyle::GetDefaultFontStyle("Regular", 12.5f))
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(2.f)

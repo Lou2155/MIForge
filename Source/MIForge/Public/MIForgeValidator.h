@@ -23,6 +23,13 @@ public:
         bool bIgnoreUnrecognizedTextures
 	) const;
 
+    FMIForgeTextureSetValidationResult ValidateDecalSet(
+        const FMIForgeTextureSet& TextureSet,
+        bool bUseDecalNormal,
+        bool bUseDecalORM,
+        bool bIgnoreUnrecognizedTextures
+	) const;
+
     FMIForgeVertexPaintLayerStackValidationResult ValidateVertexPaintLayerStack(
         const FMIForgeVertexPaintLayerStack& LayerStack,
         bool bIgnoreUnrecognizedTextures
@@ -53,6 +60,12 @@ public:
         bool bIgnoreUnrecognizedTextures
 	) const;
 
+    FMIForgeValidationSummary BuildDecalSummaryFromTextureSets(
+        const TArray<TSharedPtr<FMIForgeTextureSet>>& TextureSets,
+        bool bUseDecalNormal,
+        bool bUseDecalORM,
+		bool bIgnoreUnrecognizedTextures) const;
+
     FMIForgeVertexPaintValidationSummary BuildVertexPaintLayerStackSummary(
         const FMIForgeVertexPaintLayerStackValidationResult& LayerStackResult
 	) const;
@@ -76,6 +89,14 @@ public:
         bool bUseDetailNormalTextureRGB,
 		bool bIgnoreUnrecognizedTextures
 	) const;
+
+    FMIForgeValidationSummary BuildDecalSummaryFromTextures(
+        const TArray<TSharedPtr<FMIForgeTextureInfo>>& SelectedTextures,
+        bool bUseDecalNormal,
+        bool bUseDecalORM,
+        bool bUseOrientationMask,
+        bool bIgnoreUnrecognizedTextures
+    ) const;
 
     enum class EMIForgeTextureSetStatus : uint8
     {
@@ -151,6 +172,27 @@ public:
             return EMIForgeTextureSetStatus::Warning;
         }
 
+        return EMIForgeTextureSetStatus::Ready;
+	}
+
+    EMIForgeTextureSetStatus GetDecalSetStatus(
+        const FMIForgeTextureSet& TextureSet,
+        bool bUseDecalNormal,
+        bool bUseDecalORM,
+        bool bIgnoreUnrecognizedTextures
+    ) const
+    {
+        const FMIForgeTextureSetValidationResult Result =
+            ValidateDecalSet(TextureSet, bUseDecalNormal, bUseDecalORM, bIgnoreUnrecognizedTextures);
+        if (!Result.bCanGenerate)
+        {
+            return EMIForgeTextureSetStatus::Error;
+        }
+        if (Result.MissingOptionalTextures.Num() > 0 ||
+            Result.UnrecognizedTextures.Num() > 0)
+        {
+            return EMIForgeTextureSetStatus::Warning;
+        }
         return EMIForgeTextureSetStatus::Ready;
 	}
 

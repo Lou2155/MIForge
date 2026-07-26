@@ -44,6 +44,8 @@ FText FMIForgeMainTabViewModel::GetPresetDisplayText(EMIForgeGenerationPreset Pr
 		return FText::FromString(TEXT("RGB Masking"));
 	case EMIForgeGenerationPreset::VertexPainting:
 		return FText::FromString(TEXT("Vertex Painting"));
+	case EMIForgeGenerationPreset::Decal:
+		return FText::FromString(TEXT("Decal"));
 	}
 
 	return FText::FromString(TEXT("Unknown"));
@@ -76,6 +78,9 @@ bool FMIForgeMainTabViewModel::GetUseBaseORMTexture() const { return bUseBaseORM
 bool FMIForgeMainTabViewModel::GetEnableEmissiveChannel() const { return bEnableEmissiveChannel; }
 bool FMIForgeMainTabViewModel::GetUseDetailNormalTextureRGB() const { return bUseDetailNormalTextureRGB; }
 bool FMIForgeMainTabViewModel::GetIgnoreUnrecognizedTextures() const { return bIgnoreUnrecognizedTextures; }
+bool FMIForgeMainTabViewModel::GetUseDecalNormal() const { return bUseDecalNormal; }
+bool FMIForgeMainTabViewModel::GetUseDecalORM() const { return bUseDecalORM; }
+bool FMIForgeMainTabViewModel::GetUseOrientationMask() const { return bUseOrientationMask; }
 
 void FMIForgeMainTabViewModel::SetUseEmissiveTextures(bool bEnabled)
 {
@@ -116,6 +121,27 @@ void FMIForgeMainTabViewModel::SetUseDetailNormalTextureRGB(bool bEnabled)
 {
 	if (bUseDetailNormalTextureRGB == bEnabled) return;
 	bUseDetailNormalTextureRGB = bEnabled;
+	NotifyGenerationOptionsChanged();
+}
+
+void FMIForgeMainTabViewModel::SetUseDecalNormal(bool bEnabled)
+{
+	if (bUseDecalNormal == bEnabled) return;
+	bUseDecalNormal = bEnabled;
+	NotifyGenerationOptionsChanged();
+}
+
+void FMIForgeMainTabViewModel::SetUseDecalORM(bool bEnabled)
+{
+	if (bUseDecalORM == bEnabled) return;
+	bUseDecalORM = bEnabled;
+	NotifyGenerationOptionsChanged();
+}
+
+void FMIForgeMainTabViewModel::SetUseOrientationMask(bool bEnabled)
+{
+	if (bUseOrientationMask == bEnabled) return;
+	bUseOrientationMask = bEnabled;
 	NotifyGenerationOptionsChanged();
 }
 
@@ -301,6 +327,12 @@ void FMIForgeMainTabViewModel::RefreshValidation()
 			? Validator.BuildRGBSummaryFromTextureSets(BuildGenerationTextureSets(), bUseBaseORMTexture, bEnableEmissiveChannel, bUseDetailNormalTextureRGB, bIgnoreUnrecognizedTextures)
 			: Validator.BuildRGBSummaryFromTextures(SelectedTextureItems, bUseBaseORMTexture, bEnableEmissiveChannel, bUseDetailNormalTextureRGB, bIgnoreUnrecognizedTextures);
 	}
+	else if (CurrentPreset == EMIForgeGenerationPreset::Decal)
+	{
+		CurrentValidationSummary = CurrentInputMode == EMIForgeInputMode::TextureSets
+			? Validator.BuildDecalSummaryFromTextureSets(BuildGenerationTextureSets(), bUseDecalNormal, bUseDecalORM, bIgnoreUnrecognizedTextures)
+			: Validator.BuildDecalSummaryFromTextures(SelectedTextureItems, bUseDecalNormal, bUseDecalORM, bUseOrientationMask, bIgnoreUnrecognizedTextures);
+	}
 	else
 	{
 		CurrentVertexPaintValidationResult = Validator.ValidateVertexPaintLayerStack(VertexPaintLayerStack, bIgnoreUnrecognizedTextures);
@@ -436,3 +468,5 @@ FMIForgeVertexPaintLayerSlot* FMIForgeMainTabViewModel::FindMutableVertexPaintLa
 	}
 	return nullptr;
 }
+
+

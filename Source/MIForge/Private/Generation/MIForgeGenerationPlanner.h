@@ -45,5 +45,13 @@ private:
         const FMIForgeVertexPaintPresetDefinition& Definition,
         UMaterialInterface* ParentMaterial,
         FText& OutError) const;
+
+    bool ValidateDecalItem(
+        const FMIForgeTextureSet& TextureSet,
+        const FMIForgeMaterialPresetDefinition& Definition,
+        const TArray<FName>& ParentTextureParameterNames,
+        const TArray<FName>& ParentStaticSwitchNames,
+        const FMIForgeGenerationOptions& Options,
+		FText& OutError) const;
 	
 };

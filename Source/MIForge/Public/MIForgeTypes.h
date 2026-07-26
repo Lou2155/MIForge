@@ -151,7 +151,8 @@ enum class EMIForgeGenerationPreset : uint8
 {
     Standard,
     RGBMask,
-    VertexPainting
+    VertexPainting,
+    Decal
 };
 
 struct FMIForgeGenerationOptions
@@ -170,6 +171,10 @@ struct FMIForgeGenerationOptions
     bool bUseBaseORMTexture = true;
     bool bEnableEmissiveChannel = false;
     bool bUseDetailNormalTextureRGB = false;
+    //Decal
+    bool bUseDecalNormal = false;
+	bool bUseDecalORM = false;
+	bool bUseOrientationMask = false;
     
 };
 

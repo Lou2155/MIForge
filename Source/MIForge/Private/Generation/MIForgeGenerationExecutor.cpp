@@ -7,6 +7,7 @@
 #include "Generation/MIForgeStandardParameterApplier.h"
 #include "Generation/MIForgeRGBMaskParameterApplier.h"
 #include "Generation/MIForgeVPParameterApplier.h"
+#include "Generation/MIForgeDecalParameterApplier.h"
 
 #include "AssetToolsModule.h"
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -266,6 +267,12 @@ bool FMIForgeGenerationExecutor::ApplyMaterialParameters(UMaterialInstanceConsta
 			Item.Options,
 			OutError);
 
+	case EMIForgeGenerationPreset::Decal:
+		return FMIForgeDecalParameterApplier().Apply(
+			MaterialInstance,
+			*Item.TextureSet,
+			Item.Options,
+			OutError);
 	default:
 		OutError = FText::FromString(
 			TEXT("Unsupported generation preset."));

@@ -231,6 +231,45 @@ void FMIForgeMainTabViewModelSpec::Define()
 			TestEqual(TEXT("No required texture is missing"), ViewModel->GetValidationSummary().MissingRequiredTextureCount, 0);
 			TestEqual(TEXT("No optional Emissive texture is reported"), ViewModel->GetValidationSummary().MissingOptionalTextureCount, 0);
 		});
+
+		It("should refresh Decal validation when optional texture options change", [this]()
+		{
+			const TSharedRef<FMIForgeMainTabViewModel> ViewModel =
+				MakeShared<FMIForgeMainTabViewModel>();
+			const TSharedPtr<FMIForgeTextureSet> TextureSet =
+				MakeTextureSet(
+					TEXT("Graffiti"),
+					{ EMIForgeTextureType::Albedo });
+
+			ViewModel->SetPreset(EMIForgeGenerationPreset::Decal);
+			ViewModel->SetInputMode(EMIForgeInputMode::TextureSets);
+			ViewModel->SelectTextureSet(TextureSet);
+
+			TestEqual(
+				TEXT("One Decal set is ready"),
+				ViewModel->GetValidationSummary().ReadyToCreateCount,
+				1);
+			TestEqual(
+				TEXT("No Decal warning with optional textures disabled"),
+				ViewModel->GetValidationSummary().SetsWithWarnings,
+				0);
+
+			ViewModel->SetUseDecalNormal(true);
+			ViewModel->SetUseDecalORM(true);
+
+			TestEqual(
+				TEXT("Decal remains ready"),
+				ViewModel->GetValidationSummary().ReadyToCreateCount,
+				1);
+			TestEqual(
+				TEXT("Missing requested textures create a warning"),
+				ViewModel->GetValidationSummary().SetsWithWarnings,
+				1);
+			TestEqual(
+				TEXT("Two optional Decal textures are missing"),
+				ViewModel->GetValidationSummary().MissingOptionalTextureCount,
+				2);
+		});
 	});
 
 	Describe("Vertex Paint", [this]()

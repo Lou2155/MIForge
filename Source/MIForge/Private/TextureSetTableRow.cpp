@@ -87,6 +87,16 @@ TSharedRef<SWidget> STextureSetTableRow::GenerateWidgetForColumn(const FName& Co
 										ViewModel->GetIgnoreUnrecognizedTextures()
 									);
 							}
+							else if (Preset == EMIForgeGenerationPreset::Decal)
+							{
+								StatusResult =
+									FMIForgeValidator().GetDecalSetStatus(
+										*TextureSets,
+										ViewModel->GetUseDecalNormal(),
+										ViewModel->GetUseDecalORM(),
+										ViewModel->GetIgnoreUnrecognizedTextures()
+									);
+							}
 							else
 							{
 								StatusResult =

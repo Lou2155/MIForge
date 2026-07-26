@@ -88,6 +88,15 @@ FMIForgeMaterialGenerationPlan FMIForgeGenerationPlanner::PlanMaterialGeneration
 				Options,
 				ItemError);
 			break;
+		case EMIForgeGenerationPreset::Decal:
+			bValid = ValidateDecalItem(
+				*TextureSet,
+				*Definition,
+				ParentTextureParameterNames,
+				ParentStaticSwitchNames,
+				Options,
+				ItemError);
+			break;
 
 		default:
 			ItemError =
@@ -115,9 +124,27 @@ FMIForgeMaterialGenerationPlan FMIForgeGenerationPlanner::PlanMaterialGeneration
 		Item.TextureSet = TextureSet;
 		Item.Options = Options;
 
-		const FString DesiredAssetName = FString::Printf(
-			TEXT("MI_%s"),
-			*TextureSet->SetName);
+		FString DesiredAssetName;
+
+		if (Options.Preset == EMIForgeGenerationPreset::Decal)
+		{
+			DesiredAssetName = FString::Printf(
+				TEXT("MI_Decal_%s"),
+				*TextureSet->SetName);
+		}
+		else if (Options.Preset == EMIForgeGenerationPreset::RGBMask)
+		{
+			DesiredAssetName = FString::Printf(
+				TEXT("MI_RGB_%s"),
+				*TextureSet->SetName);
+		}
+		else
+		{
+			DesiredAssetName = FString::Printf(
+				TEXT("MI_%s"),
+				*TextureSet->SetName);
+		}
+
 
 		const FString PackageName = FString::Printf(
 			TEXT("%s/%s"),
@@ -750,6 +777,160 @@ bool FMIForgeGenerationPlanner::ValidateVertexPaintPlan(const FMIForgeVertexPain
 		{
 			return false;
 		}
+	}
+
+	return true;
+}
+
+bool FMIForgeGenerationPlanner::ValidateDecalItem(const FMIForgeTextureSet& TextureSet, const FMIForgeMaterialPresetDefinition& Definition, const TArray<FName>& ParentTextureParameterNames, const TArray<FName>& ParentStaticSwitchNames, const FMIForgeGenerationOptions& Options, FText& OutError) const
+{
+	OutError = FText::GetEmpty();
+
+	auto ValidateTextureMapping =
+		[&Definition, &ParentTextureParameterNames, &OutError](
+			EMIForgeTextureType TextureType,
+			const TCHAR* DisplayName
+			) -> bool
+		{
+			const FMIForgeTextureBinding* Binding =
+				Definition.FindTextureBinding(TextureType);
+
+			if (!Binding || Binding->ParameterName.IsNone())
+			{
+				OutError = FText::FromString(
+					FString::Printf(
+						TEXT("No texture parameter mapping is configured for %s."),
+						DisplayName
+					)
+				);
+				return false;
+			}
+
+			if (!ParentTextureParameterNames.Contains(Binding->ParameterName))
+			{
+				OutError = FText::FromString(
+					FString::Printf(
+						TEXT("Parent material does not contain the %s texture parameter '%s'."),
+						DisplayName,
+						*Binding->ParameterName.ToString()
+					)
+				);
+				return false;
+			}
+
+			return true;
+		};
+
+	auto ValidateRequiredTexture =
+		[&TextureSet, &OutError, &ValidateTextureMapping](
+			EMIForgeTextureType TextureType,
+			const TCHAR* DisplayName
+			) -> bool
+		{
+			if (!ValidateTextureMapping(TextureType, DisplayName))
+			{
+				return false;
+			}
+
+			const FMIForgeTextureInfo* TextureInfo =
+				TextureSet.Textures.Find(TextureType);
+
+			if (!TextureInfo || !TextureInfo->AssetData.IsValid())
+			{
+				OutError = FText::FromString(
+					FString::Printf(
+						TEXT("Required %s texture is missing for set '%s'."),
+						DisplayName,
+						*TextureSet.SetName
+					)
+				);
+				return false;
+			}
+
+			UTexture* Texture =
+				Cast<UTexture>(TextureInfo->AssetData.GetAsset());
+
+			if (!Texture)
+			{
+				OutError = FText::FromString(
+					FString::Printf(
+						TEXT("Required %s texture could not be loaded for set '%s'."),
+						DisplayName,
+						*TextureSet.SetName
+					)
+				);
+				return false;
+			}
+
+			return true;
+		};
+
+	auto ValidateStaticSwitch =
+		[&Definition, &ParentStaticSwitchNames, &OutError](
+			EMIForgePresetOptions Option,
+			const TCHAR* DisplayName
+			) -> bool
+		{
+			const FMIForgeStaticSwitchBinding* Binding =
+				Definition.FindStaticSwitchBinding(Option);
+
+			if (!Binding || Binding->ParameterName.IsNone())
+			{
+				OutError = FText::FromString(
+					FString::Printf(
+						TEXT("No static bool parameter is configured for %s."),
+						DisplayName
+					)
+				);
+				return false;
+			}
+
+			if (!ParentStaticSwitchNames.Contains(Binding->ParameterName))
+			{
+				OutError = FText::FromString(
+					FString::Printf(
+						TEXT("Parent material does not contain the %s static bool '%s'."),
+						DisplayName,
+						*Binding->ParameterName.ToString()
+					)
+				);
+				return false;
+			}
+
+			return true;
+		};
+
+	// Required texture assets and mappings.
+	if (!ValidateRequiredTexture(EMIForgeTextureType::Albedo, TEXT("Albedo")))
+	{
+		return false;
+	}
+
+	// Optional texture mappings are required only when the user requested them.
+	// The optional texture asset itself may still be absent; that remains a warning.
+	if (Options.bUseDecalNormal &&
+		!ValidateTextureMapping(EMIForgeTextureType::Normal, TEXT("Normal")))
+	{
+		return false;
+	}
+
+	if (Options.bUseDecalORM &&
+		!ValidateTextureMapping(EMIForgeTextureType::ORM, TEXT("ORM")))
+	{
+		return false;
+	}
+
+	if (!ValidateStaticSwitch(
+		EMIForgePresetOptions::UseDecalNormal,
+		TEXT("Decal Normal")) ||
+		!ValidateStaticSwitch(
+			EMIForgePresetOptions::UseDecalORM,
+			TEXT("Decal ORM")) ||
+		!ValidateStaticSwitch(
+			EMIForgePresetOptions::UseOrientationMask,
+			TEXT("Orientation Mask")))
+	{
+		return false;
 	}
 
 	return true;
