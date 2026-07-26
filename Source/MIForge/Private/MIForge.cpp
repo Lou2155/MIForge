@@ -1,4 +1,7 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// MIForge
+// Copyright (c) 2026 Tianshuo Liu
+// Licensed under the MIT License.
+// See LICENSE file in the project root for full license information.
 
 #include "MIForge.h"
 #include "ContentBrowserModule.h"
