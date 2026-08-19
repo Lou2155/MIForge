@@ -2,6 +2,8 @@
 
 MIForge is an Unreal Engine Editor plugin that automates texture compression correction, texture validation, Material Instance generation, and batch Material Instance parameter editing.
 
+Link to demo video: https://www.youtube.com/watch?v=XDp6PPc6YBc
+
 ![MIForge Settings](Docs/Images/MIForge_Interface.png)
 
 ![MIForge Settings](Docs/Images/Batch_Param_Editor.png)
