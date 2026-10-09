@@ -48,6 +48,11 @@ FMIForgeGenerationResult FMIForgeGenerationExecutor::Execute(const FMIForgeMater
 				Target,
 				AssetTools);
 
+		// New assets retain their finished state in the creation undo record.
+		// Only updates need native object snapshots (which also serialize name/outer).
+		TGuardValue<ITransaction*> ParameterTransactionGuard(
+			GUndo, Resolution.Action == EMIForgeGenerationAction::Created ? nullptr : GUndo);
+
 		switch (Resolution.Action)
 		{
 		case EMIForgeGenerationAction::Skipped:
@@ -173,6 +178,9 @@ FMIForgeGenerationResult FMIForgeGenerationExecutor::Execute(const FMIForgeVerte
 		FMIForgeMaterialInstanceResolver().Resolve(
 			Target,
 			AssetTools);
+
+	TGuardValue<ITransaction*> ParameterTransactionGuard(
+		GUndo, Resolution.Action == EMIForgeGenerationAction::Created ? nullptr : GUndo);
 
 	switch (Resolution.Action)
 	{

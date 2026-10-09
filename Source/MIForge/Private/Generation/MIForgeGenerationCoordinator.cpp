@@ -49,6 +49,13 @@ FMIForgeGenerationOutcome FMIForgeGenerationCoordinator::ExecuteVertexPaintGener
 FMIForgeGenerationOutcome FMIForgeGenerationCoordinator::ExecuteGeneration(const FString& TargetPath, const FText& TransactionText, TFunctionRef<FMIForgeGenerationResult()> Generate) const
 {
 	FMIForgeGenerationOutcome Outcome;
+	if (!UMIForgeGenerationUndoRecord::FlushPendingAssetChanges())
+	{
+		Outcome.Result.FailedCount = 1;
+		Outcome.SummaryText = LOCTEXT("PendingUndoFailed", "Could not finish the previous MIForge undo. Check the Output Log before generating again.");
+		Outcome.Result.Messages.Add(Outcome.SummaryText);
+		return Outcome;
+	}
 
 	{
 		FScopedTransaction Transaction(TransactionText);
@@ -77,17 +84,7 @@ FMIForgeGenerationOutcome FMIForgeGenerationCoordinator::ExecuteGeneration(const
 
 void FMIForgeGenerationCoordinator::RecordCreatedAssetsForUndo(const TArray<UObject*>& CreatedAssets) const
 {
-	TArray<FSoftObjectPath> ValidCreatedPaths;
-
-	for (UObject* CreatedAsset : CreatedAssets)
-	{
-		if (IsValid(CreatedAsset))
-		{
-			ValidCreatedPaths.AddUnique(FSoftObjectPath(CreatedAsset));
-		}
-	}
-
-	if (ValidCreatedPaths.IsEmpty())
+	if (CreatedAssets.IsEmpty())
 	{
 		return;
 	}
@@ -95,11 +92,11 @@ void FMIForgeGenerationCoordinator::RecordCreatedAssetsForUndo(const TArray<UObj
 	UMIForgeGenerationUndoRecord* UndoRecord = 
 		NewObject<UMIForgeGenerationUndoRecord>(GetTransientPackage(), 
 			NAME_None, 
-			RF_Transactional);
+			RF_Transient);
 
-	UndoRecord->CreatedAssetPaths = MoveTemp(ValidCreatedPaths);
-	UndoRecord->Modify();
-	UndoRecord->bAssetsShouldExist = true;
+	// Do not register the record's own construction as an undoable object deletion.
+	UndoRecord->SetFlags(RF_Transactional);
+	UndoRecord->Initialize(CreatedAssets);
 
 }
 
